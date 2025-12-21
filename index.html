@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en" class="light">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light">
+    <title>Donasiku Landing Page</title>
+    <meta property="og:image" content="https://bolt.new/static/og_default.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
+    <style>
+      /* Force light mode - prevent browser dark mode */
+      html {
+        color-scheme: light !important;
+      }
+      body {
+        color-scheme: light !important;
+        background-color: #ffffff !important;
+      }
+    </style>
+    <script>
+      (function() {
+        try {
+          // Color Settings
+          var primaryColor = localStorage.getItem('primaryColor');
+          if (primaryColor) {
+            document.documentElement.style.setProperty('--primary-color', primaryColor);
+            
+            // Hardcoded brightness calculation for hover (darken ~20%)
+            // Need to handle both 3-digit and 6-digit hex ideally, but let's assume 6 for standard picker
+            var hex = primaryColor.replace('#', '');
+            if (hex.length === 3) {
+                hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+            }
+            var num = parseInt(hex, 16);
+            var amt = -20; // Darken by 20 units (approx)
+            var R = (num >> 16) + amt;
+            var G = (num >> 8 & 0x00FF) + amt;
+            var B = (num & 0x0000FF) + amt;
+            
+            var hoverColor = '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+                (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+                (B < 255 ? B < 1 ? 0 : B : 255))
+                .toString(16).slice(1);
+                
+            document.documentElement.style.setProperty('--primary-color-hover', hoverColor);
+          }
+
+          // Font Settings
+          var fontSettings = localStorage.getItem('fontSettings');
+          if (fontSettings) {
+            var parsed = JSON.parse(fontSettings);
+            if (parsed.fontFamily) document.documentElement.style.setProperty('--font-family', parsed.fontFamily);
+            if (parsed.fontSize) document.documentElement.style.setProperty('--font-size-base', parsed.fontSize + 'px');
+            if (parsed.fontWeight) document.documentElement.style.setProperty('--font-weight-normal', parsed.fontWeight);
+          }
+        } catch (e) {
+          console.error('Error loading initial settings form localStorage:', e);
+        }
+      })();
+    </script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

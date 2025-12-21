@@ -1,0 +1,201 @@
+import { useRef, useMemo } from 'react';
+import ReactQuill, { Quill } from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
+import { supabase } from '../lib/supabase';
+import { uploadToS3 } from '../utils/s3Storage';
+
+// Custom image handler is managed via modules configuration below
+
+
+interface RichTextEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}
+
+export default function RichTextEditor({ value, onChange, placeholder = 'Masukkan keterangan campaign...' }: RichTextEditorProps) {
+  const quillRef = useRef<ReactQuill>(null);
+
+  const imageHandler = async () => {
+    const input = document.createElement('input');
+    input.setAttribute('type', 'file');
+    input.setAttribute('accept', 'image/*');
+    input.click();
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      // Show loading
+      const quill = quillRef.current?.getEditor();
+      if (!quill) return;
+
+      const range = quill.getSelection(true);
+      const index = range?.index || 0;
+
+      // Insert placeholder
+      quill.insertText(index, 'Uploading image...', 'user');
+      quill.setSelection(index + 20);
+
+      try {
+        // Upload original image without resize
+        let imageUrl: string | null = null;
+
+        // Try S3 upload
+        const s3Url = await uploadToS3(file, 'campaigns/editor');
+        if (s3Url) {
+          imageUrl = s3Url;
+        } else {
+          // Fallback to Supabase Storage
+          const fileExt = file.name.split('.').pop() || 'jpg';
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const filePath = `campaigns/editor/${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('campaigns')
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: false
+            });
+
+          if (!uploadError) {
+            const { data } = supabase.storage
+              .from('campaigns')
+              .getPublicUrl(filePath);
+            imageUrl = data.publicUrl;
+          }
+        }
+
+        if (imageUrl) {
+          // Remove placeholder and insert image
+          quill.deleteText(index, 20);
+          quill.insertEmbed(index, 'image', imageUrl, 'user');
+          quill.setSelection(index + 1);
+        } else {
+          // Remove placeholder and show error
+          quill.deleteText(index, 20);
+          quill.insertText(index, 'Failed to upload image', 'user');
+          alert('Gagal mengupload gambar. Silakan coba lagi.');
+        }
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        const quill = quillRef.current?.getEditor();
+        if (quill) {
+          const range = quill.getSelection(true);
+          const index = range?.index || 0;
+          quill.deleteText(index - 20, 20);
+          quill.insertText(index - 20, 'Failed to upload image', 'user');
+        }
+        alert('Gagal mengupload gambar. Silakan coba lagi.');
+      }
+    };
+  };
+
+  const modules = useMemo(() => ({
+    toolbar: {
+      container: [
+        [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+        [{ 'font': [] }],
+        [{ 'size': [] }],
+        ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
+        [{ 'color': [] }, { 'background': [] }],
+        [{ 'align': [] }],
+        ['link', 'image', 'video'],
+        ['clean']
+      ],
+      handlers: {
+        image: imageHandler
+      }
+    },
+    clipboard: {
+      matchVisual: false
+    }
+  }), []);
+
+  const formats = [
+    'header', 'font', 'size',
+    'bold', 'italic', 'underline', 'strike', 'blockquote',
+    'list', 'bullet', 'indent',
+    'color', 'background',
+    'align',
+    'link', 'image', 'video'
+  ];
+
+  return (
+    <div className="rich-text-editor">
+      <ReactQuill
+        ref={quillRef}
+        theme="snow"
+        value={value}
+        onChange={onChange}
+        modules={modules}
+        formats={formats}
+        placeholder={placeholder}
+        style={{ minHeight: '400px' }}
+      />
+      <style>{`
+        .rich-text-editor .ql-container {
+          min-height: 400px;
+          font-size: 16px;
+        }
+        .rich-text-editor .ql-editor {
+          min-height: 400px;
+        }
+        .rich-text-editor .ql-editor.ql-blank::before {
+          font-style: normal;
+          color: #9ca3af;
+        }
+        .rich-text-editor .ql-toolbar {
+          border-top-left-radius: 0.5rem;
+          border-top-right-radius: 0.5rem;
+          border: 2px solid #e5e7eb;
+          border-bottom: none;
+        }
+        .rich-text-editor .ql-container {
+          border-bottom-left-radius: 0.5rem;
+          border-bottom-right-radius: 0.5rem;
+          border: 2px solid #e5e7eb;
+          border-top: none;
+        }
+        .rich-text-editor .ql-container:focus-within,
+        .rich-text-editor .ql-toolbar:focus-within {
+          border-color: #f97316;
+        }
+        .rich-text-editor .ql-editor img {
+          width: 650px;
+          height: 350px;
+          object-fit: cover;
+          object-position: center;
+          display: block;
+          margin: 1em auto;
+          border-radius: 0.5rem;
+        }
+        @media (max-width: 768px) {
+          .rich-text-editor .ql-editor img {
+            width: 100%;
+            height: auto;
+            max-height: 350px;
+            object-fit: contain;
+          }
+        }
+        
+        /* Fix for Tailwind Preflight resetting list styles */
+        .rich-text-editor .ql-editor ul {
+          list-style-type: disc !important;
+          padding-left: 1.5rem !important;
+          margin-bottom: 1rem;
+        }
+        .rich-text-editor .ql-editor ol {
+          list-style-type: decimal !important;
+          padding-left: 1.5rem !important;
+          margin-bottom: 1rem;
+        }
+        .rich-text-editor .ql-editor li {
+          margin-bottom: 0.25rem;
+        }
+      `}</style>
+    </div>
+  );
+}
+

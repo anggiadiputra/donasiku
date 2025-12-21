@@ -1,0 +1,13 @@
+/**
+ * Generate random invoice code
+ * Format: INV-xxxxxx (6 random alphanumeric characters)
+ */
+export function generateInvoiceCode(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = 'INV-';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+

@@ -1,0 +1,94 @@
+import { ReactNode, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { LogOut, Bell, Menu } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import Sidebar from './Sidebar';
+import { useAppName } from '../hooks/useAppName';
+
+interface DashboardLayoutProps {
+  children: ReactNode;
+}
+
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const navigate = useNavigate();
+  const { appName } = useAppName();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      navigate('/login');
+    }
+  };
+
+  // Get first letter of app name for icon
+  const appInitial = appName.charAt(0).toUpperCase();
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Mobile Sidebar Overlay */}
+      <div
+        className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-300 md:hidden ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+        onClick={() => setIsSidebarOpen(false)}
+      />
+
+      {/* Mobile Sidebar (Slide-in) */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white transition-transform duration-300 transform md:hidden ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+      >
+        <Sidebar onClose={() => setIsSidebarOpen(false)} />
+      </div>
+
+      {/* Desktop Sidebar (Persistent) */}
+      <div className="hidden md:block bg-white border-r border-gray-200 fixed md:static inset-y-0 left-0 z-30 transition-all duration-300">
+        <Sidebar />
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 min-w-0 md:ml-0 transition-all duration-300">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
+          <div className="px-4 py-4 md:px-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors md:hidden"
+                >
+                  <Menu className="w-6 h-6 text-gray-700" />
+                </button>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-lg">{appInitial}</span>
+                  </div>
+                  <h1 className="text-lg font-bold text-gray-800 line-clamp-1">{appName}</h1>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                  <Bell className="w-5 h-5 text-gray-600" />
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <LogOut className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Page Content */}
+        <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
