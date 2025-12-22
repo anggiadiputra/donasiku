@@ -259,14 +259,8 @@ export default function DonationForm() {
 
       const anonymousName = isFidyahPage ? 'Hamba Allah' : 'Orang Baik';
 
-      console.log('🚀 Creating Duitku transaction...');
-      console.log('📋 Request data:', {
-        campaignId: displayCampaign.id,
-        amount,
-        paymentMethod,
-        customerName: hideName ? anonymousName : fullName,
-        customerPhone: phone,
-      });
+
+
 
       // Custom product details for Fidyah
       const numberOfDays = (location.state as any)?.numberOfDays || 1;
@@ -289,7 +283,7 @@ export default function DonationForm() {
         },
       });
 
-      console.log('✅ Transaction response:', transaction);
+
 
       if (transactionError) {
         console.error('❌ Transaction Error:', transactionError);
@@ -297,7 +291,7 @@ export default function DonationForm() {
       }
 
       if (transaction && transaction.transaction) {
-        console.log('📄 Navigating to invoice page...');
+
 
         // Navigate to invoice page with transaction data
         navigate(`/invoice/${transaction.transaction.invoiceCode}`, {

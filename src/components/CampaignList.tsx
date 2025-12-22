@@ -54,7 +54,7 @@ export default function CampaignList({ onCampaignClick }: CampaignListProps) {
           if (!allError && allData) {
             // Filter published campaigns on client side
             const publishedCampaigns = allData.filter(c => c.status === 'published');
-            console.log('Found published campaigns (client-side filter):', publishedCampaigns.length);
+
             setCampaigns(publishedCampaigns);
             return;
           }
@@ -66,8 +66,8 @@ export default function CampaignList({ onCampaignClick }: CampaignListProps) {
         }
         setCampaigns([]);
       } else {
-        console.log('Successfully fetched campaigns:', data?.length || 0);
-        console.log('Campaigns data:', data);
+
+
         setCampaigns(data || []);
       }
     } catch (error) {

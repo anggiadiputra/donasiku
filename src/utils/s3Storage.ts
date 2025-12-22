@@ -227,19 +227,19 @@ export const uploadToS3 = async (
   const s3ApiEndpoint = import.meta.env.VITE_S3_API_ENDPOINT;
 
   if (s3ApiEndpoint && s3ApiEndpoint.trim() !== '') {
-    console.log('Attempting S3 upload via backend API...');
+
     const s3Url = await uploadToS3ViaAPI(file, folder);
     if (s3Url) {
-      console.log('S3 upload successful:', s3Url);
+
       return s3Url;
     }
-    console.log('S3 upload failed, falling back...');
+
   }
 
   // If no API endpoint, try direct upload (not recommended)
   const s3Config = getS3Config();
   if (s3Config) {
-    console.log('Attempting direct S3 upload...');
+
     const directUrl = await uploadToS3Direct(file, folder);
     if (directUrl) {
       return directUrl;

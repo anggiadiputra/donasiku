@@ -176,7 +176,7 @@ export default function CampaignsPage() {
               // Decode URI component to handle spaces/special chars if any
               const decodedPath = decodeURIComponent(filePath);
 
-              console.log('Attempting to delete image:', decodedPath);
+
               const { error: storageError } = await supabase
                 .storage
                 .from('campaigns')
@@ -186,7 +186,7 @@ export default function CampaignsPage() {
                 console.error('Error deleting image from storage:', storageError);
                 // Don't block campaign deletion, just log error
               } else {
-                console.log('Image deleted successfully');
+
               }
             }
           } catch (urlError) {

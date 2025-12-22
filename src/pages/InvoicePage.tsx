@@ -135,7 +135,7 @@ export default function InvoicePage() {
         if (error) {
           console.error('Error fetching payment fee:', error);
         } else if (data?.total_fee) {
-          console.log('📊 Payment fee from DB:', data.total_fee);
+
           setPaymentFee(parseFloat(data.total_fee));
         }
       } catch (error) {
@@ -168,7 +168,7 @@ export default function InvoicePage() {
         if (error) {
           console.error('Error fetching transaction status:', error);
         } else if (data) {
-          console.log('📊 Transaction status from DB:', data.status);
+
           if (data.status !== transactionStatusRef.current) {
             setTransactionStatus(data.status);
           }
@@ -266,7 +266,7 @@ export default function InvoicePage() {
   const handleCheckPayment = async () => {
     try {
       setIsChecking(true);
-      console.log('🔍 Checking payment status for:', transaction.merchantOrderId);
+
 
       const { data, error } = await supabase.functions.invoke('check-duitku-transaction', {
         body: {
@@ -279,7 +279,7 @@ export default function InvoicePage() {
         throw new Error(error.message || 'Gagal memeriksa status pembayaran');
       }
 
-      console.log('✅ Payment check response:', data);
+
 
       if (data && data.status) {
         if (data.status === 'success') {
@@ -316,16 +316,7 @@ export default function InvoicePage() {
   // Calculate total amount using fetched payment fee
   const totalAmount = transaction.amount + paymentFee;
 
-  console.log('💰 Payment calculations:', {
-    amount: transaction.amount,
-    paymentFee: paymentFee,
-    totalAmount: totalAmount,
-    formatted: {
-      amount: formatCurrency(transaction.amount),
-      fee: formatCurrency(paymentFee),
-      total: formatCurrency(totalAmount),
-    }
-  });
+
 
   return (
     <div className="fixed inset-0 bg-gray-100 flex justify-center">

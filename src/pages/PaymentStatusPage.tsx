@@ -90,7 +90,7 @@ export default function PaymentStatusPage() {
 
             if (error) throw error;
 
-            console.log('Transaction status:', data);
+
 
             // Refresh transaction data
             await fetchTransaction();

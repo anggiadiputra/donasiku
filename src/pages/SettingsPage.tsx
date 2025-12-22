@@ -351,7 +351,7 @@ export default function SettingsPage() {
       const { data, error } = await supabase
         .from('payment_methods')
         .select('*')
-        .order('category', { ascending: true })
+        // .order('category', { ascending: true }) // Removed to respect manual sort_order
         .order('sort_order', { ascending: true });
 
       if (error) {
@@ -445,7 +445,7 @@ export default function SettingsPage() {
       setUploadingLogo(true);
 
       const s3Endpoint = import.meta.env.VITE_S3_API_ENDPOINT;
-      console.log('🔍 Debug S3 Endpoint:', s3Endpoint);
+
 
       if (!s3Endpoint) {
         console.error('❌ Missing VITE_S3_API_ENDPOINT');
@@ -455,9 +455,9 @@ export default function SettingsPage() {
       }
 
       // Upload to S3
-      console.log('🚀 Attempting S3 upload via API...');
+
       const logoUrl = await uploadToS3ViaAPI(file, 'logos');
-      console.log('✅ S3 Upload Result:', logoUrl);
+
 
       if (logoUrl) {
         setSettings(prev => ({ ...prev, logo_url: logoUrl }));

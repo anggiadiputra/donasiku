@@ -126,15 +126,15 @@ export default function AddNewCampaignPage() {
 
     try {
       // Try S3 compatible storage first (if configured)
-      console.log('Attempting S3 upload...');
+
       const s3Url = await uploadToS3(imageFile, 'campaigns', imagePreview);
       if (s3Url) {
-        console.log('S3 upload successful:', s3Url);
+
         return s3Url;
       }
 
       // Fallback to Supabase Storage
-      console.log('S3 upload not configured, falling back to Supabase Storage...');
+
       try {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -163,7 +163,7 @@ export default function AddNewCampaignPage() {
           .from('campaigns')
           .getPublicUrl(filePath);
 
-        console.log('Supabase upload successful:', data.publicUrl);
+
         return data.publicUrl;
       } catch (supabaseError) {
         console.error('Error uploading to Supabase:', supabaseError);
