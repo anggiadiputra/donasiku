@@ -1,11 +1,8 @@
-import { useRef, useMemo } from 'react';
-import ReactQuill, { Quill } from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import { useEffect, useRef } from 'react';
+import Quill from 'quill';
+import 'quill/dist/quill.snow.css';
 import { supabase } from '../lib/supabase';
 import { uploadToS3 } from '../utils/s3Storage';
-
-// Custom image handler is managed via modules configuration below
-
 
 interface RichTextEditorProps {
   value: string;
@@ -14,7 +11,77 @@ interface RichTextEditorProps {
 }
 
 export default function RichTextEditor({ value, onChange, placeholder = 'Masukkan keterangan campaign...' }: RichTextEditorProps) {
-  const quillRef = useRef<ReactQuill>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const quillRef = useRef<Quill | null>(null);
+
+  // Initialize Quill
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // Prevent double initialization
+    if (quillRef.current) return;
+
+    const quill = new Quill(containerRef.current, {
+      theme: 'snow',
+      placeholder: placeholder,
+      modules: {
+        toolbar: {
+          container: [
+            [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+            [{ 'font': [] }],
+            [{ 'size': [] }],
+            ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
+            [{ 'color': [] }, { 'background': [] }],
+            [{ 'align': [] }],
+            ['link', 'image', 'video'],
+            ['clean']
+          ],
+          handlers: {
+            image: imageHandler
+          }
+        },
+        clipboard: {
+          matchVisual: false
+        }
+      }
+    });
+
+    quill.on('text-change', () => {
+      onChange(quill.root.innerHTML);
+    });
+
+    quillRef.current = quill;
+
+    // Set initial value
+    if (value) {
+      quill.root.innerHTML = value;
+    }
+
+    return () => {
+      // Cleanup if needed? Quill doesn't have a strict destroy, but we should clear ref
+      quillRef.current = null;
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
+    };
+  }, []); // Run once on mount
+
+  // Sync value changes from parent
+  useEffect(() => {
+    if (quillRef.current) {
+      if (value !== quillRef.current.root.innerHTML) {
+        // Only update if content is different to avoid cursor jumps
+        // But basic innerHTML comparison is tricky with Quill
+        // For now, this is standard React-Quill pattern
+        // A better check might be needed if user types fast
+        const currentContent = quillRef.current.root.innerHTML;
+        if (value !== currentContent) {
+          quillRef.current.root.innerHTML = value;
+        }
+      }
+    }
+  }, [value]);
 
   const imageHandler = async () => {
     const input = document.createElement('input');
@@ -26,8 +93,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Masukka
       const file = input.files?.[0];
       if (!file) return;
 
-      // Show loading
-      const quill = quillRef.current?.getEditor();
+      const quill = quillRef.current;
       if (!quill) return;
 
       const range = quill.getSelection(true);
@@ -79,72 +145,29 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Masukka
         }
       } catch (error) {
         console.error('Error uploading image:', error);
-        const quill = quillRef.current?.getEditor();
         if (quill) {
-          const range = quill.getSelection(true);
-          const index = range?.index || 0;
-          quill.deleteText(index - 20, 20);
-          quill.insertText(index - 20, 'Failed to upload image', 'user');
+          quill.deleteText(index, 20);
+          quill.insertText(index, 'Failed to upload image', 'user');
         }
         alert('Gagal mengupload gambar. Silakan coba lagi.');
       }
     };
   };
 
-  const modules = useMemo(() => ({
-    toolbar: {
-      container: [
-        [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-        [{ 'font': [] }],
-        [{ 'size': [] }],
-        ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-        [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
-        [{ 'color': [] }, { 'background': [] }],
-        [{ 'align': [] }],
-        ['link', 'image', 'video'],
-        ['clean']
-      ],
-      handlers: {
-        image: imageHandler
-      }
-    },
-    clipboard: {
-      matchVisual: false
-    }
-  }), []);
-
-  const formats = [
-    'header', 'font', 'size',
-    'bold', 'italic', 'underline', 'strike', 'blockquote',
-    'list', 'bullet', 'indent',
-    'color', 'background',
-    'align',
-    'link', 'image', 'video'
-  ];
-
   return (
     <div className="rich-text-editor">
-      <ReactQuill
-        ref={quillRef}
-        theme="snow"
-        value={value}
-        onChange={onChange}
-        modules={modules}
-        formats={formats}
-        placeholder={placeholder}
+      <div
+        ref={containerRef}
         style={{ minHeight: '400px' }}
       />
       <style>{`
         .rich-text-editor .ql-container {
           min-height: 400px;
           font-size: 16px;
-        }
-        .rich-text-editor .ql-editor {
-          min-height: 400px;
-        }
-        .rich-text-editor .ql-editor.ql-blank::before {
-          font-style: normal;
-          color: #9ca3af;
+          border-bottom-left-radius: 0.5rem;
+          border-bottom-right-radius: 0.5rem;
+          border: 2px solid #e5e7eb;
+          border-top: none;
         }
         .rich-text-editor .ql-toolbar {
           border-top-left-radius: 0.5rem;
@@ -152,15 +175,16 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Masukka
           border: 2px solid #e5e7eb;
           border-bottom: none;
         }
-        .rich-text-editor .ql-container {
-          border-bottom-left-radius: 0.5rem;
-          border-bottom-right-radius: 0.5rem;
-          border: 2px solid #e5e7eb;
-          border-top: none;
-        }
         .rich-text-editor .ql-container:focus-within,
         .rich-text-editor .ql-toolbar:focus-within {
           border-color: #f97316;
+        }
+        .rich-text-editor .ql-editor {
+          min-height: 400px;
+        }
+        .rich-text-editor .ql-editor.ql-blank::before {
+          font-style: normal;
+          color: #9ca3af;
         }
         .rich-text-editor .ql-editor img {
           width: 650px;

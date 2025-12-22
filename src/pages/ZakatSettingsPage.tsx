@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { supabase, ZakatSettings } from '../lib/supabase';
+import { usePageTitle } from '../hooks/usePageTitle';
+import { SettingsPageSkeleton } from '../components/SkeletonLoader';
 
 export default function ZakatSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -26,6 +28,8 @@ export default function ZakatSettingsPage() {
   useEffect(() => {
     fetchSettings();
   }, []);
+
+  usePageTitle('Pengaturan Zakat');
 
   const fetchSettings = async () => {
     try {
@@ -118,9 +122,7 @@ export default function ZakatSettingsPage() {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-        </div>
+        <SettingsPageSkeleton />
       </DashboardLayout>
     );
   }

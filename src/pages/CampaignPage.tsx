@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Share2 } from 'lucide-react';
 import { supabase, Campaign, Testimonial } from '../lib/supabase';
+import ShareModal from '../components/ShareModal';
 
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { CampaignPageSkeleton } from '../components/SkeletonLoader';
 import { useAppName } from '../hooks/useAppName';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function CampaignPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -15,11 +17,14 @@ export default function CampaignPage() {
   const primaryColor = usePrimaryColor();
   const { appName } = useAppName();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
+
+  usePageTitle(campaign?.title || 'Detail Campaign');
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [donors, setDonors] = useState<any[]>([]);
   const [realtimeStats, setRealtimeStats] = useState({ amount: 0, count: 0 });
+  const [showShareModal, setShowShareModal] = useState(false);
 
 
 
@@ -559,6 +564,7 @@ export default function CampaignPage() {
         <div className="border-t border-gray-200 bg-white p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 shrink-0">
           <div className="flex gap-3">
             <button
+              onClick={() => setShowShareModal(true)}
               className="w-12 h-12 flex items-center justify-center rounded border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors shrink-0"
               aria-label="Bagikan"
             >
@@ -576,7 +582,12 @@ export default function CampaignPage() {
       </div>
 
 
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        shareUrl={`${window.location.origin}${window.location.pathname}?utm_source=socialsharing_donor_web_campaign_detail&utm_medium=share_campaign_copas&utm_campaign=share_detail_campaign`}
+        shareText={campaign ? `Bantu ${campaign.title} di Donasiku!` : 'Bantu campaign ini di Donasiku!'}
+      />
     </div>
   );
 }
-

@@ -6,6 +6,7 @@ import Sidebar from '../components/Sidebar';
 import { useAppName } from '../hooks/useAppName';
 import { TableSkeleton } from '../components/SkeletonLoader';
 import ReceiptModal from '../components/ReceiptModal';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface Transaction {
     id: string;
@@ -35,6 +36,7 @@ interface Campaign {
 }
 
 export default function DonasiDashboardPage() {
+    usePageTitle('Dashboard Donasi');
     const navigate = useNavigate();
     const { appName } = useAppName();
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -484,6 +486,33 @@ export default function DonasiDashboardPage() {
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Pagination */}
+                            {!loading && filteredTransactions.length > 0 && (
+                                <div className="px-6 py-4 border-t border-gray-200">
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-sm text-gray-500">
+                                            Showing {Math.min(startIndex + 1, filteredTransactions.length)} to {Math.min(endIndex, filteredTransactions.length)} of {filteredTransactions.length} results
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                                                disabled={currentPage === 1}
+                                                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Previous
+                                            </button>
+                                            <button
+                                                onClick={() => setCurrentPage(Math.min(Math.ceil(filteredTransactions.length / entriesPerPage), currentPage + 1))}
+                                                disabled={currentPage >= Math.ceil(filteredTransactions.length / entriesPerPage)}
+                                                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Next
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

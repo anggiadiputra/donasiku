@@ -9,6 +9,8 @@ import DashboardLayout from '../components/DashboardLayout';
 import ImageUpload from '../components/ImageUpload';
 import RichTextEditor from '../components/RichTextEditor';
 import { supabase, FidyahSettings, Campaign } from '../lib/supabase';
+import { usePageTitle } from '../hooks/usePageTitle';
+import { SettingsPageSkeleton } from '../components/SkeletonLoader';
 
 export default function FidyahSettingsPage() {
     const [loading, setLoading] = useState(true);
@@ -30,6 +32,8 @@ export default function FidyahSettingsPage() {
     useEffect(() => {
         fetchData();
     }, []);
+
+    usePageTitle('Pengaturan Fidyah');
 
     const fetchData = async () => {
         try {
@@ -131,9 +135,7 @@ export default function FidyahSettingsPage() {
     if (loading) {
         return (
             <DashboardLayout>
-                <div className="flex items-center justify-center h-64">
-                    <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-                </div>
+                <SettingsPageSkeleton />
             </DashboardLayout>
         );
     }

@@ -629,7 +629,14 @@ export default function EditCampaignPage() {
 
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                <p className="text-sm text-gray-600 capitalize">{status}</p>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as 'draft' | 'published')}
+                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 capitalize"
+                >
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                </select>
               </div>
 
               <div className="space-y-3">

@@ -5,10 +5,12 @@ import { supabase } from '../lib/supabase';
 import { useAppName } from '../hooks/useAppName';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import Header from '../components/Header';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function LoginPage() {
+  usePageTitle('Masuk');
   const navigate = useNavigate();
-  const { appName } = useAppName();
+  // const { appName } = useAppName(); // Unused
   const primaryColor = usePrimaryColor();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);

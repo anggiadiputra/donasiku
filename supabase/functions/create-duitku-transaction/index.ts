@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { crypto } from 'https://deno.land/std@0.177.0/crypto/mod.ts'
+import nodemailer from "npm:nodemailer@6.9.7";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +14,62 @@ async function md5(str: string): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('MD5', msgUint8)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function getEnv(key: string): string {
+  return Deno.env.get(key) || Deno.env.get(`VITE_${key}`) || '';
+}
+
+async function sendEmail(to: string, subject: string, htmlBody: string) {
+  const SMTP_HOST = getEnv('SMTP_HOST')
+  const SMTP_PORT = parseInt(getEnv('SMTP_PORT') || '587')
+  const SMTP_USER = getEnv('SMTP_USER')
+  const SMTP_PASS = getEnv('SMTP_PASSWORD') || getEnv('SMTP_PASS')
+  const SENDER_EMAIL = getEnv('SMTP_FROM') || getEnv('SENDER_EMAIL') || SMTP_USER || 'no-reply@app.com'
+
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    console.error('❌ SMTP credentials missing')
+    return
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    });
+
+    await transporter.sendMail({
+      from: SENDER_EMAIL,
+      to: to,
+      subject: subject,
+      html: htmlBody,
+    });
+    console.log(`📧 Email sent to ${to}`);
+  } catch (error) {
+    console.error('❌ Failed to send email:', error);
+  }
+}
+
+async function sendWhatsApp(target: string, message: string) {
+  const FONNTE_TOKEN = getEnv('FONNTE_TOKEN');
+  if (!FONNTE_TOKEN || !target) return;
+
+  try {
+    const form = new FormData();
+    form.append('target', target);
+    form.append('message', message);
+
+    await fetch('https://api.fonnte.com/send', {
+      method: 'POST',
+      headers: { 'Authorization': FONNTE_TOKEN },
+      body: form
+    });
+    console.log(`📱 WhatsApp sent to ${target}`);
+  } catch (error) {
+    console.error('❌ Failed to send WhatsApp:', error);
+  }
 }
 
 serve(async (req) => {
@@ -73,8 +130,36 @@ serve(async (req) => {
     expiryTime.setHours(expiryTime.getHours() + 24)
 
     // URLs
-    const callbackUrl = Deno.env.get('DUITKU_CALLBACK_URL') || 'https://donasiku.com/api/payment/callback'
-    const finalReturnUrl = returnUrl || 'https://donasiku.com/payment/success'
+    let APP_URL = getEnv('APP_URL') || getEnv('VITE_APP_URL');
+
+    if (!APP_URL) {
+      console.error('⚠️ APP_URL or VITE_APP_URL is missing! Invoice links will be broken.');
+      APP_URL = '';
+    }
+
+    // Remove trailing slash if present
+    APP_URL = APP_URL.replace(/\/$/, '');
+
+    // Construct Callback URL
+    // If DUITKU_CALLBACK_URL is set, use it.
+    // Otherwise, construct dynamic Supabase Function URL: https://lrycaoioytevqfvmrhij.supabase.co/functions/v1/duitku-callback
+    let callbackUrl = getEnv('DUITKU_CALLBACK_URL');
+
+    if (!callbackUrl) {
+      const sbUrl = Deno.env.get('SUPABASE_URL');
+      if (sbUrl && !sbUrl.includes('localhost') && !sbUrl.includes('127.0.0.1')) {
+        callbackUrl = `${sbUrl}/functions/v1/duitku-callback`;
+      } else {
+        // Fallback to known production URL (based on project ID)
+        // This is a safety measure if SUPABASE_URL is missing or local
+        console.log('⚠️ SUPABASE_URL missing or local. Using hardcoded production URL.');
+        callbackUrl = 'https://lrycaoioytevqfvmrhij.supabase.co/functions/v1/duitku-callback';
+      }
+      console.log('ℹ️ Using generated Callback URL:', callbackUrl);
+    }
+
+    // For return URL and Invoice link, use APP_URL
+    const finalReturnUrl = returnUrl || `${APP_URL}/payment/success`
 
     // Signature: MD5(merchantCode + merchantOrderId + paymentAmount + apiKey)
     const signatureRaw = `${DUITKU_MERCHANT_CODE}${merchantOrderId}${amount}${DUITKU_API_KEY}`
@@ -117,7 +202,8 @@ serve(async (req) => {
 
     if (duitkuData.statusCode !== '00') {
       console.error('❌ Duitku error:', duitkuData)
-      throw new Error(duitkuData.statusMessage || 'Payment gateway error')
+      const errorMsg = duitkuData.statusMessage || 'Payment gateway error';
+      throw new Error(`Duitku Error (${duitkuData.statusCode}): ${errorMsg}`);
     }
 
     // Save to database
@@ -154,7 +240,41 @@ serve(async (req) => {
       throw new Error('Failed to save transaction')
     }
 
-    console.log('✅ Transaction created successfully')
+    console.log('✅ Transaction created successfully', transaction.id)
+
+    // ----------------------------------------------------
+    // NOTIFICATIONS (Pending)
+    // ----------------------------------------------------
+    const invoiceLink = `${APP_URL}/invoice/${invoiceCode}`;
+    const formattedAmount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
+    const donorName = customerName || 'Orang Baik';
+
+    // 1. WhatsApp
+    if (customerPhone) {
+      const waMessage = `Halo ${donorName},\n\nTerima kasih atas niat baik Anda untuk berdonasi.\n\nMohon selesaikan pembayaran sebesar *${formattedAmount}*.\n\nKeperluan: ${finalProductDetails}\n\nUntuk instruksi pembayaran, silakan klik link di bawah ini:\n${invoiceLink}\n\nTerima kasih.`;
+      await sendWhatsApp(customerPhone, waMessage);
+    }
+
+    // 2. Email
+    if (customerEmail) {
+      const subject = `Menunggu Pembayaran: ${finalProductDetails}`;
+      const html = `
+            <h2>Menunggu Pembayaran</h2>
+            <p>Halo <strong>${donorName}</strong>,</p>
+            <p>Terima kasih atas donasi Anda. Berikut adalah detail pembayaran yang harus diselesaikan:</p>
+            <ul>
+                <li><strong>Jumlah:</strong> ${formattedAmount}</li>
+                <li><strong>Keperluan:</strong> ${finalProductDetails}</li>
+                <li><strong>No. Invoice:</strong> ${invoiceCode}</li>
+            </ul>
+            <p>Silakan klik tombol di bawah ini untuk melihat instruksi pembayaran:</p>
+            <a href="${invoiceLink}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Bayar Sekarang</a>
+            <br/><br/>
+            <p>Atau klik link ini: <a href="${invoiceLink}">${invoiceLink}</a></p>
+            <p>Terima kasih,<br/>Tim Donasiku</p>
+        `;
+      await sendEmail(customerEmail, subject, html);
+    }
 
     // Return response
     return new Response(

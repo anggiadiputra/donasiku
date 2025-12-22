@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
+import { CampaignDonorsSkeleton } from '../components/SkeletonLoader';
 
 // Utility functions (mirrored from utils/format usually, or inline if simple)
 const formatCurrency = (amount: number) => {
@@ -85,6 +86,10 @@ export default function CampaignDonorsPage() {
         return name.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
+    if (loading) {
+        return <CampaignDonorsSkeleton />;
+    }
+
     return (
         <div className="flex flex-col h-screen bg-gray-50">
             {/* Header */}
@@ -132,11 +137,7 @@ export default function CampaignDonorsPage() {
 
             {/* List */}
             <div className="flex-1 overflow-y-auto p-4">
-                {loading ? (
-                    <div className="flex justify-center py-10">
-                        <div className="animate-spin w-6 h-6 border-2 border-gray-200 border-t-blue-500 rounded-full" style={{ borderTopColor: primaryColor }} />
-                    </div>
-                ) : filteredDonors.length === 0 ? (
+                {filteredDonors.length === 0 ? (
                     <div className="text-center py-10 text-gray-500 text-sm">
                         {searchQuery ? 'Tidak ada donatur dengan nama tersebut.' : 'Belum ada donatur.'}
                     </div>

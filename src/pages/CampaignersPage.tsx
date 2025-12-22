@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Users, Target, DollarSign, Calendar, Eye, ExternalLink, Menu, Bell, LogOut } from 'lucide-react';
+import { Search, Users, Target, DollarSign, Eye, Menu, Bell, LogOut, Edit2, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
-import { useAppName } from '../hooks/useAppName';
+// import { useAppName } from '../hooks/useAppName';
 import { TableSkeleton } from '../components/SkeletonLoader';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface Campaigner {
     user_id: string;
     user_email: string;
     organization_name: string;
+    phone_number?: string;
     total_campaigns: number;
     active_campaigns: number;
     total_raised: number;
@@ -21,7 +23,7 @@ interface Campaigner {
 
 export default function CampaignersPage() {
     const navigate = useNavigate();
-    const { appName } = useAppName();
+    // const { appName } = useAppName();
     const [campaigners, setCampaigners] = useState<Campaigner[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -29,6 +31,12 @@ export default function CampaignersPage() {
     const [entriesPerPage, setEntriesPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    // Edit modal state
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [editingCampaigner, setEditingCampaigner] = useState<Campaigner | null>(null);
+    const [editForm, setEditForm] = useState({ organization_name: '', phone_number: '' });
+    const [saving, setSaving] = useState(false);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -38,6 +46,9 @@ export default function CampaignersPage() {
     useEffect(() => {
         fetchCampaigners();
     }, []);
+
+    // Set page title
+    usePageTitle('Data Campaigner');
 
     const fetchCampaigners = async () => {
         try {
@@ -51,20 +62,21 @@ export default function CampaignersPage() {
 
             if (campError) throw campError;
 
-            // Fetch profiles to get emails
+            // Fetch profiles to get emails, phone, and organization_name
             const userIds = [...new Set(campaigns?.map(c => c.user_id).filter(Boolean))];
             const { data: profiles } = await supabase
                 .from('profiles')
-                .select('id, email')
+                .select('id, email, phone, organization_name')
                 .in('id', userIds);
 
             const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
-            // Fetch transactions to count donors
+            // Fetch transactions to count donors (only campaign-related transactions)
             const { data: transactions } = await supabase
                 .from('transactions')
-                .select('campaign_id, customer_phone, customer_email, status')
-                .eq('status', 'success');
+                .select('campaign_id, customer_name, customer_phone, customer_email, status')
+                .eq('status', 'success')
+                .not('campaign_id', 'is', null); // Exclude fidyah, zakat, infaq transactions
 
             // Group by campaigner (user_id)
             const campaignerMap = new Map<string, Campaigner>();
@@ -95,7 +107,8 @@ export default function CampaignersPage() {
                     campaignerMap.set(userId, {
                         user_id: userId,
                         user_email: profile?.email || '-',
-                        organization_name: camp.organization_name || 'Unknown Organization',
+                        organization_name: profile?.organization_name || camp.organization_name || 'Unknown Organization',
+                        phone_number: profile?.phone || '',
                         total_campaigns: 1,
                         active_campaigns: camp.status === 'published' ? 1 : 0,
                         total_raised: camp.current_amount || 0,
@@ -107,24 +120,25 @@ export default function CampaignersPage() {
                 }
             });
 
-            // Calculate unique donors per campaigner
-            campaigns?.forEach((camp) => {
-                const userId = camp.user_id || 'unknown';
-                const campaigner = campaignerMap.get(userId);
-                if (campaigner) {
-                    // Get all transactions for this campaigner's campaigns
-                    const campaignerCampaigns = campaigns.filter(c => c.user_id === userId);
-                    const campaignIds = campaignerCampaigns.map(c => c.id);
-                    const campaignerTxs = transactions?.filter(tx =>
-                        campaignIds.includes(tx.campaign_id)
-                    ) || [];
+            // Calculate unique donors per campaigner (iterate through campaigners, not campaigns)
+            campaignerMap.forEach((campaigner, userId) => {
+                // Get all campaigns for this campaigner
+                const campaignerCampaigns = campaigns?.filter(c => c.user_id === userId) || [];
+                const campaignIds = campaignerCampaigns.map(c => c.id);
 
-                    // Count unique donors
-                    const uniqueDonors = new Set(
-                        campaignerTxs.map(tx => tx.customer_phone || tx.customer_email)
-                    );
-                    campaigner.total_donors = uniqueDonors.size;
-                }
+                // Get all transactions for this campaigner's campaigns
+                const campaignerTxs = transactions?.filter(tx =>
+                    campaignIds.includes(tx.campaign_id)
+                ) || [];
+
+                // Count unique donors (by phone or email)
+                const uniqueDonors = new Set(
+                    campaignerTxs
+                        .map(tx => tx.customer_phone || tx.customer_email)
+                        .filter(Boolean) // Remove null/undefined values
+                );
+
+                campaigner.total_donors = uniqueDonors.size;
             });
 
             const campaignersList = Array.from(campaignerMap.values());
@@ -156,6 +170,41 @@ export default function CampaignersPage() {
     const calculateProgress = (raised: number, target: number) => {
         if (target === 0) return 0;
         return Math.min(100, Math.round((raised / target) * 100));
+    };
+
+    const handleEditClick = (campaigner: Campaigner) => {
+        setEditingCampaigner(campaigner);
+        setEditForm({
+            organization_name: campaigner.organization_name,
+            phone_number: campaigner.phone_number || '',
+        });
+        setEditModalOpen(true);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingCampaigner) return;
+
+        try {
+            setSaving(true);
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    organization_name: editForm.organization_name,
+                    phone: editForm.phone_number,
+                })
+                .eq('id', editingCampaigner.user_id);
+
+            if (error) throw error;
+
+            // Refresh data
+            await fetchCampaigners();
+            setEditModalOpen(false);
+        } catch (error) {
+            console.error('Error updating campaigner:', error);
+            alert('Gagal mengupdate data campaigner');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const filteredCampaigners = campaigners.filter((campaigner) =>
@@ -201,8 +250,7 @@ export default function CampaignersPage() {
                                 <Menu className="w-6 h-6" />
                             </button>
                             <div>
-                                <h1 className="text-2xl font-bold text-gray-800">Data Campaigner</h1>
-                                <p className="text-sm text-gray-600">Kelola data pembuat campaign</p>
+                                {/* Title removed from here */}
                             </div>
                         </div>
 
@@ -226,6 +274,12 @@ export default function CampaignersPage() {
                 {/* Main Content */}
 
                 <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+                    {/* Page Title (Moved from Header) */}
+                    <div className="mb-6">
+                        <h1 className="text-2xl font-bold text-gray-800">Data Campaigner</h1>
+                        <p className="text-sm text-gray-600">Kelola data pembuat campaign</p>
+                    </div>
+
                     {/* Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
@@ -388,6 +442,13 @@ export default function CampaignersPage() {
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-2">
                                                         <button
+                                                            onClick={() => handleEditClick(campaigner)}
+                                                            className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                                            title="Edit Campaigner"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                        <button
                                                             onClick={() => navigate('/donasi/campaigns')}
                                                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                                                             title="Lihat Campaigns"
@@ -431,7 +492,73 @@ export default function CampaignersPage() {
                         )}
                     </div>
                 </div>
-            </div >
-        </div >
+            </div>
+
+            {/* Edit Modal */}
+            {editModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                            <h3 className="text-xl font-bold text-gray-900">Edit Campaigner</h3>
+                            <button
+                                onClick={() => setEditModalOpen(false)}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            >
+                                <X className="w-5 h-5 text-gray-500" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Nama Organisasi
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editForm.organization_name}
+                                    onChange={(e) => setEditForm({ ...editForm, organization_name: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Masukkan nama organisasi"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Nomor WhatsApp
+                                </label>
+                                <input
+                                    type="tel"
+                                    value={editForm.phone_number}
+                                    onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Contoh: 628123456789"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Format: 628xxxxxxxxx (tanpa tanda +)</p>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+                            <button
+                                onClick={() => setEditModalOpen(false)}
+                                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                                disabled={saving}
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={handleSaveEdit}
+                                className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+                                disabled={saving}
+                            >
+                                {saving ? 'Menyimpan...' : 'Simpan'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

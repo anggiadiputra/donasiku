@@ -77,6 +77,7 @@ export interface AppSettings {
   id: string;
   app_name: string;
   logo_url?: string;
+  tagline?: string;
   primary_color?: string;
   font_family?: string;
   payment_methods?: string | any[]; // JSON string or array

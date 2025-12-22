@@ -33,14 +33,22 @@ export default function CampaignCard({ campaign, onClick }: CampaignCardProps) {
 
   // Calculate days remaining (default to 30 days if no end date)
   const calculateDaysRemaining = () => {
-    // If we have an end_date field, use it. Otherwise, calculate from created_at + 30 days
+    if (campaign.end_date) {
+      const endDate = new Date(campaign.end_date);
+      const today = new Date();
+      const diffTime = endDate.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return Math.max(0, diffDays);
+    }
+
+    // If no end_date, calculate from created_at + 30 days
     const createdDate = new Date(campaign.created_at);
     const endDate = new Date(createdDate);
     endDate.setDate(endDate.getDate() + 30); // Default 30 days
     const today = new Date();
     const diffTime = endDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
+    return Math.max(0, diffDays);
   };
 
   const daysRemaining = calculateDaysRemaining();
@@ -98,7 +106,7 @@ export default function CampaignCard({ campaign, onClick }: CampaignCardProps) {
         </div>
 
         {/* Stats at bottom */}
-        <div className="flex justify-between items-end gap-2">
+        <div className="flex justify-between items-end gap-2 mb-2">
           <div className="min-w-0">
             <span className="text-xs text-gray-600 block">Terkumpul</span>
             <span className="text-sm font-bold text-gray-800 truncate block">Rp{formatCurrency(campaign.current_amount)}</span>
@@ -107,6 +115,17 @@ export default function CampaignCard({ campaign, onClick }: CampaignCardProps) {
             <span className="text-xs text-gray-600 block">Sisa hari</span>
             <span className="text-sm font-semibold text-gray-700">{daysRemaining}</span>
           </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${Math.min((campaign.current_amount / campaign.target_amount) * 100, 100)}%`,
+              backgroundColor: primaryColor
+            }}
+          />
         </div>
       </div>
     </div>

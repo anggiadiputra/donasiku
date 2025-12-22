@@ -4,11 +4,24 @@ import { Copy, CheckCircle, Clock, Loader2, Printer } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { supabase } from '../lib/supabase';
 import ReceiptModal from '../components/ReceiptModal';
+import { InvoicePageSkeleton } from '../components/SkeletonLoader';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function InvoicePage() {
-  const { invoiceCode: _invoiceCode } = useParams<{ invoiceCode: string }>();
+  const { invoiceCode } = useParams<{ invoiceCode: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<{
+    transaction: any;
+    campaign: any;
+    customerName: string;
+    customerPhone: string;
+    customerEmail: string;
+    customerMessage: string;
+    paymentMethodName?: string;
+  } | null>(null);
+
   const [copiedVA, setCopiedVA] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [paymentFee, setPaymentFee] = useState(3000); // Default fee
@@ -17,17 +30,91 @@ export default function InvoicePage() {
   // Receipt Modal
   const [showReceiptModal, setShowReceiptModal] = useState(false);
 
+  // Set page title
+  usePageTitle(transactionStatus === 'success' ? 'Invoice Pembayaran' : 'Instruksi Pembayaran');
+
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<'success' | 'pending' | 'failed'>('pending');
   const [modalMessage, setModalMessage] = useState('');
 
-  // Get data from navigation state
-  const stateData = location.state as any;
-  const transaction = stateData?.transaction;
-  const campaign = stateData?.campaign;
-  const customerName = stateData?.customerName || 'Orang Baik';
-  const paymentMethodName = stateData?.paymentMethodName;
+  useEffect(() => {
+    const initData = async () => {
+      setLoading(true);
+
+      // 1. Try to get data from navigation state
+      if (location.state?.transaction) {
+        setData({
+          transaction: location.state.transaction,
+          campaign: location.state.campaign,
+          customerName: location.state.customerName || 'Orang Baik',
+          customerPhone: location.state.customerPhone || '',
+          customerEmail: location.state.customerEmail || '',
+          customerMessage: location.state.customerMessage || '',
+          paymentMethodName: location.state.paymentMethodName
+        });
+        setLoading(false);
+        return;
+      }
+
+      // 2. If no state, fetch from database using invoiceCode
+      if (invoiceCode) {
+        try {
+          const { data: tx, error: txError } = await supabase
+            .from('transactions')
+            .select('*')
+            .or(`invoice_code.eq.${invoiceCode},merchant_order_id.eq.${invoiceCode}`)
+            .single();
+
+          if (txError) throw txError;
+
+          if (tx) {
+            // Fetch campaign
+            const { data: camp, error: campError } = await supabase
+              .from('campaigns')
+              .select('*')
+              .eq('id', tx.campaign_id)
+              .single();
+
+            if (campError) throw campError;
+
+            // Map DB snake_case to component camelCase expectations
+            const mappedTransaction = {
+              ...tx,
+              merchantOrderId: tx.merchant_order_id,
+              paymentMethod: tx.payment_method,
+              createdAt: tx.created_at,
+              expiryTime: tx.expiry_time,
+              duitkuReference: tx.duitku_reference,
+              vaNumber: tx.va_number,
+              qrString: tx.qr_string,
+              invoiceCode: tx.invoice_code
+            };
+
+            setData({
+              transaction: mappedTransaction,
+              campaign: camp,
+              customerName: tx.customer_name || 'Orang Baik',
+              customerPhone: tx.customer_phone || '',
+              customerEmail: tx.customer_email || '',
+              customerMessage: tx.customer_message || '',
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching invoice data:', error);
+        }
+      }
+
+      setLoading(false);
+    };
+
+    initData();
+  }, [invoiceCode, location.state]);
+
+  const transaction = data?.transaction;
+  const campaign = data?.campaign;
+  const customerName = data?.customerName || 'Orang Baik';
+  const paymentMethodName = data?.paymentMethodName;
 
   // Extract primitives for stable dependencies
   const merchantOrderId = transaction?.merchantOrderId;
@@ -103,19 +190,9 @@ export default function InvoicePage() {
     return () => clearInterval(interval);
   }, [merchantOrderId]);
 
-  console.log('📄 Invoice page state:', {
-    transaction,
-    campaign,
-    customerName,
-    paymentMethodName,
-  });
-  console.log('🔍 Transaction fields:', {
-    created_at: transaction?.created_at,
-    expiryTime: transaction?.expiryTime,
-    reference: transaction?.reference,
-    duitkuReference: transaction?.duitkuReference,
-    merchantOrderId: transaction?.merchantOrderId,
-  });
+  if (loading) {
+    return <InvoicePageSkeleton />;
+  }
 
   // If no data, show error
   if (!transaction || !campaign) {
@@ -366,26 +443,8 @@ export default function InvoicePage() {
               </div>
             )}
 
-            {/* Konfirmasi Button - Only show if payment is pending */}
-            {transactionStatus !== 'success' && (
-              <button
-                onClick={handleCheckPayment}
-                disabled={isChecking}
-                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-4 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
-              >
-                {isChecking ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Memeriksa Pembayaran...
-                  </>
-                ) : (
-                  'Konfirmasi'
-                )}
-              </button>
-            )}
-
             {/* Action Buttons */}
-            <div className="flex items-center gap-3">
+            <div className="flex gap-3">
               <button
                 onClick={() => {
                   if (campaign?.slug) {
@@ -394,15 +453,32 @@ export default function InvoicePage() {
                     navigate('/');
                   }
                 }}
-                className="flex-1 text-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm transition-colors py-2 px-4 rounded-lg"
+                className="flex-1 text-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm transition-colors py-3 px-4 rounded-lg"
               >
                 Kembali
               </button>
 
+              {/* Konfirmasi Button - Only show if payment is pending */}
+              {transactionStatus !== 'success' && (
+                <button
+                  onClick={handleCheckPayment}
+                  disabled={isChecking}
+                  className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isChecking ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    </>
+                  ) : (
+                    'Konfirmasi'
+                  )}
+                </button>
+              )}
+
               {transactionStatus === 'success' && (
                 <button
                   onClick={() => setShowReceiptModal(true)}
-                  className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-3 px-4 rounded-lg transition-colors"
                 >
                   <Printer className="w-4 h-4" />
                   Kwitansi
@@ -511,9 +587,9 @@ export default function InvoicePage() {
               merchant_order_id: transaction.merchantOrderId || '',
               invoice_code: transaction.invoiceCode || '',
               customer_name: customerName,
-              customer_phone: stateData?.customerPhone || '',
-              customer_email: stateData?.customerEmail || '',
-              customer_message: stateData?.customerMessage || '',
+              customer_phone: data?.customerPhone || '',
+              customer_email: data?.customerEmail || '',
+              customer_message: data?.customerMessage || '',
               amount: transaction.amount || 0,
               payment_method: transaction.paymentMethod || '',
               status: transactionStatus,

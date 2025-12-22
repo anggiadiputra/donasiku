@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Save as SaveIcon,
   Upload,
   Image as ImageIcon,
   X,
@@ -41,6 +42,30 @@ import { CSS } from '@dnd-kit/utilities';
 import DashboardLayout from '../components/DashboardLayout';
 import { supabase, AppSettings } from '../lib/supabase';
 import { uploadToS3ViaAPI } from '../utils/s3Storage';
+import { usePageTitle } from '../hooks/usePageTitle';
+import { usePrimaryColor } from '../hooks/usePrimaryColor';
+import { SettingsPageSkeleton } from '../components/SkeletonLoader';
+// Card Save Button Component
+interface CardSaveButtonProps {
+  isSaving: boolean;
+  onClick: () => void;
+  primaryColor: string;
+  label?: string;
+}
+
+const CardSaveButton = ({ isSaving, onClick, primaryColor, label = 'Simpan' }: CardSaveButtonProps) => (
+  <div className="flex justify-end mt-6">
+    <button
+      onClick={onClick}
+      disabled={isSaving}
+      className="px-6 py-2 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+      style={{ backgroundColor: primaryColor }}
+    >
+      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <SaveIcon className="w-4 h-4" />}
+      {isSaving ? 'Menyimpan...' : label}
+    </button>
+  </div>
+);
 
 // Sortable Payment Method Item Component
 interface SortablePaymentMethodProps {
@@ -171,8 +196,9 @@ function SortablePaymentMethod({ method, onToggle }: SortablePaymentMethodProps)
 }
 
 export default function SettingsPage() {
+  const primaryColor = usePrimaryColor();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingSection, setSavingSection] = useState<string | null>(null);
   const [testingS3, setTestingS3] = useState(false);
   const [s3TestResult, setS3TestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [testingEmail, setTestingEmail] = useState(false);
@@ -186,6 +212,7 @@ export default function SettingsPage() {
     id: '',
     app_name: 'Donasiku',
     logo_url: '',
+    tagline: '',
     primary_color: '#f97316',
     payment_methods: ['bank_transfer', 'qris'],
     whatsapp_enabled: false,
@@ -247,16 +274,23 @@ export default function SettingsPage() {
     }
   }, []);
 
+  usePageTitle('Pengaturan');
+
   const applyFontSettings = (fontSettings: any) => {
     document.documentElement.style.setProperty('--font-family', fontSettings.fontFamily);
     document.documentElement.style.setProperty('--font-size-base', `${fontSettings.fontSize}px`);
     document.documentElement.style.setProperty('--font-weight-normal', fontSettings.fontWeight.toString());
   };
 
-  const saveFontSettings = () => {
+  const saveFontSettings = async () => {
+    setSavingSection('fonts');
+    await new Promise(resolve => setTimeout(resolve, 800)); // UX delay
     localStorage.setItem('fontSettings', JSON.stringify(fontSettings));
     applyFontSettings(fontSettings);
-    alert('Pengaturan font disimpan!');
+    // alert('Pengaturan font disimpan!'); // Removed alert for cleaner UX, or keep it? LayoutSettings uses alert.
+    // LayoutSettings used proper saving. I'll keep alert but after loading.
+    setSavingSection(null);
+    alert('Pengaturan font berhasil disimpan!');
   };
 
   // Apply primary color globally
@@ -357,30 +391,15 @@ export default function SettingsPage() {
     }
   };
 
-  const togglePaymentMethod = async (methodId: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('payment_methods')
-        .update({ is_active: !currentStatus })
-        .eq('id', methodId);
-
-      if (error) {
-        console.error('Error updating payment method:', error);
-        alert('Gagal update payment method');
-        return;
-      }
-
-      // Update local state
-      setPaymentMethods(prev =>
-        prev.map(method =>
-          method.id === methodId
-            ? { ...method, is_active: !currentStatus }
-            : method
-        )
-      );
-    } catch (error) {
-      console.error('Error:', error);
-    }
+  const togglePaymentMethod = (methodId: string, currentStatus: boolean) => {
+    // Update local state ONLY (Manual Save Refactor)
+    setPaymentMethods(prev =>
+      prev.map(method =>
+        method.id === methodId
+          ? { ...method, is_active: !currentStatus }
+          : method
+      )
+    );
   };
 
   // Drag and drop sensors
@@ -392,7 +411,7 @@ export default function SettingsPage() {
   );
 
   // Handle drag end
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (!over || active.id === over.id) {
@@ -402,30 +421,9 @@ export default function SettingsPage() {
     const oldIndex = paymentMethods.findIndex((m) => m.id === active.id);
     const newIndex = paymentMethods.findIndex((m) => m.id === over.id);
 
-    // Reorder locally first for immediate UI feedback
+    // Reorder locally ONLY (Manual Save Refactor)
     const newOrder = arrayMove(paymentMethods, oldIndex, newIndex);
     setPaymentMethods(newOrder);
-
-    // Update sort_order in database
-    try {
-      const updates = newOrder.map((method, index) => ({
-        id: method.id,
-        sort_order: index
-      }));
-
-      for (const update of updates) {
-        await supabase
-          .from('payment_methods')
-          .update({ sort_order: update.sort_order })
-          .eq('id', update.id);
-      }
-
-      console.log('Payment methods reordered successfully');
-    } catch (error) {
-      console.error('Error updating order:', error);
-      // Revert on error
-      await fetchPaymentMethods();
-    }
   };
 
   const handleLogoUpload = async (file: File) => {
@@ -525,9 +523,31 @@ export default function SettingsPage() {
     setSettings(prev => ({ ...prev, logo_url: '' }));
   };
 
-  const handleSave = async () => {
+  const handleSave = async (section?: string) => {
     try {
-      setSaving(true);
+      setSavingSection(section || 'global');
+
+      if (section === 'payment_methods') {
+        const updates = paymentMethods.map((method, index) => ({
+          id: method.id,
+          sort_order: index,
+          is_active: method.is_active
+        }));
+
+        for (const update of updates) {
+          await supabase
+            .from('payment_methods')
+            .update({
+              sort_order: update.sort_order,
+              is_active: update.is_active
+            })
+            .eq('id', update.id);
+        }
+        await fetchPaymentMethods();
+        setSavingSection(null);
+        alert('Metode pembayaran berhasil disimpan!');
+        return;
+      }
 
       const settingsToSave = {
         ...settings,
@@ -576,9 +596,11 @@ export default function SettingsPage() {
       console.error('Error saving settings:', error);
       alert('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));
     } finally {
-      setSaving(false);
+      setSavingSection(null);
     }
   };
+
+
 
   const testS3Connection = async () => {
     try {
@@ -673,9 +695,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-        </div>
+        <SettingsPageSkeleton />
       </DashboardLayout>
     );
   }
@@ -710,9 +730,24 @@ export default function SettingsPage() {
                   value={settings.app_name}
                   onChange={(e) => setSettings(prev => ({ ...prev, app_name: e.target.value }))}
                   placeholder="Donasiku"
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
+                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[var(--primary-color)]"
                 />
                 <p className="text-xs text-gray-500 mt-1">Nama aplikasi akan ditampilkan di seluruh aplikasi</p>
+              </div>
+
+              {/* Tagline Aplikasi */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tagline Aplikasi
+                </label>
+                <input
+                  type="text"
+                  value={settings.tagline || ''}
+                  onChange={(e) => setSettings(prev => ({ ...prev, tagline: e.target.value }))}
+                  placeholder="Platform Kebaikan"
+                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Tagline akan ditampilkan di judul halaman home</p>
               </div>
 
               {/* Logo Upload */}
@@ -774,7 +809,7 @@ export default function SettingsPage() {
                   >
                     {uploadingLogo ? (
                       <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                        <Loader2 className="w-6 h-6 animate-spin" style={{ color: primaryColor }} />
                         <span className="text-sm text-gray-600">Mengupload...</span>
                       </div>
                     ) : (
@@ -790,7 +825,6 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Primary Color */}
             <div className="mt-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Warna Utama
@@ -820,6 +854,12 @@ export default function SettingsPage() {
               </div>
               <p className="text-xs text-gray-500 mt-1">Warna utama akan digunakan di seluruh aplikasi</p>
             </div>
+
+            <CardSaveButton
+              isSaving={savingSection === 'app_identity'}
+              onClick={() => handleSave('app_identity')}
+              primaryColor={primaryColor}
+            />
           </div>
 
           {/* Font Settings */}
@@ -921,13 +961,11 @@ export default function SettingsPage() {
               </div>
 
               {/* Save Button */}
-              <button
+              <CardSaveButton
+                isSaving={savingSection === 'fonts'}
                 onClick={saveFontSettings}
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-md flex items-center justify-center gap-2"
-              >
-                <CheckCircle2 className="w-5 h-5" />
-                Simpan Pengaturan Font
-              </button>
+                primaryColor={primaryColor}
+              />
             </div>
           </div>
 
@@ -962,16 +1000,11 @@ export default function SettingsPage() {
                 />
               </div>
 
-              <div className="flex justify-end">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  Simpan Template
-                </button>
-              </div>
+              <CardSaveButton
+                isSaving={savingSection === 'whatsapp'}
+                onClick={() => handleSave('whatsapp')}
+                primaryColor={primaryColor}
+              />
             </div>
           </div>
 
@@ -1006,7 +1039,8 @@ export default function SettingsPage() {
                   <button
                     onClick={testFonnteConnection}
                     disabled={testingFonnte || !testPhoneNumber}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 text-sm whitespace-nowrap flex items-center gap-2"
+                    className="px-4 py-2 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 text-sm whitespace-nowrap flex items-center gap-2"
+                    style={{ backgroundColor: primaryColor }}
                   >
                     {testingFonnte ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Test Koneksi'}
                   </button>
@@ -1040,16 +1074,11 @@ export default function SettingsPage() {
                 />
               </div>
 
-              <div className="flex justify-start">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  Simpan Template
-                </button>
-              </div>
+              <CardSaveButton
+                isSaving={savingSection === 'fonnte'}
+                onClick={() => handleSave('fonnte')}
+                primaryColor={primaryColor}
+              />
             </div>
           </div>
 
@@ -1068,7 +1097,8 @@ export default function SettingsPage() {
               <button
                 onClick={syncPaymentMethods}
                 disabled={syncingPaymentMethods}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: primaryColor }}
               >
                 {syncingPaymentMethods ? (
                   <>
@@ -1175,6 +1205,12 @@ export default function SettingsPage() {
                     Sync ulang untuk mendapatkan update terbaru dari Duitku.
                   </p>
                 </div>
+
+                <CardSaveButton
+                  isSaving={savingSection === 'payment_methods'}
+                  onClick={() => handleSave('payment_methods')}
+                  primaryColor={primaryColor}
+                />
               </div>
             )}
           </div>
@@ -1216,7 +1252,8 @@ export default function SettingsPage() {
                     <button
                       onClick={testSmtpConnection}
                       disabled={testingEmail}
-                      className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-3 py-2 text-white text-sm rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                      style={{ backgroundColor: primaryColor }}
                     >
                       {testingEmail ? (
                         <>
@@ -1266,6 +1303,12 @@ export default function SettingsPage() {
                     Template ini akan dikirim ke email donatur setelah pembayaran berhasil.
                   </p>
                 </div>
+
+                <CardSaveButton
+                  isSaving={savingSection === 'email'}
+                  onClick={() => handleSave('email')}
+                  primaryColor={primaryColor}
+                />
               </div>
             )}
           </div>
@@ -1302,7 +1345,8 @@ export default function SettingsPage() {
                 <button
                   onClick={testS3Connection}
                   disabled={testingS3}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg font-semibold hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-4 py-2 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: primaryColor }}
                 >
                   {testingS3 ? (
                     <>
@@ -1334,23 +1378,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Save Button */}
-          <div className="flex justify-end">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-6 py-3 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Menyimpan...
-                </>
-              ) : (
-                'Simpan Pengaturan'
-              )}
-            </button>
-          </div>
+
         </div>
       </div>
     </DashboardLayout>

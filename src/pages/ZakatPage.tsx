@@ -14,13 +14,16 @@ import {
 import { supabase, ZakatSettings } from '../lib/supabase';
 import Header from '../components/Header';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { getHoverColor } from '../utils/colorUtils';
 import Footer from '../components/Footer';
+import { ZakatPageSkeleton } from '../components/SkeletonLoader';
 
 type ZakatType = 'penghasilan' | 'tabungan' | 'perdagangan' | 'emas';
 type Frequency = 'monthly' | 'yearly';
 
 export default function ZakatPage() {
+  usePageTitle('Bayar Zakat');
   const navigate = useNavigate();
   const primaryColor = usePrimaryColor();
   const hoverColor = getHoverColor(primaryColor);
@@ -109,15 +112,7 @@ export default function ZakatPage() {
   const result = calculateZakat();
 
   if (loading) {
-    return (
-      <div className="fixed inset-0 bg-gray-100 flex justify-center">
-        <div className="w-full max-w-[480px] bg-white shadow-2xl flex flex-col h-full relative">
-          <div className="flex items-center justify-center h-full">
-            <div className="text-gray-600">Loading...</div>
-          </div>
-        </div>
-      </div>
-    );
+    return <ZakatPageSkeleton />;
   }
 
   return (

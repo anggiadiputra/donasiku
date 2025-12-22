@@ -3,8 +3,8 @@ import {
   Layout,
   Image,
   List,
-  Grid,
-  FileText,
+
+
   Plus,
   Trash2,
   Loader2,
@@ -103,7 +103,11 @@ import { FileText as FileTextIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import ImageUpload from '../components/ImageUpload';
+
 import { supabase, LayoutSettings } from '../lib/supabase';
+import { SettingsPageSkeleton } from '../components/SkeletonLoader';
+import { usePageTitle } from '../hooks/usePageTitle';
+import { usePrimaryColor } from '../hooks/usePrimaryColor';
 
 // List of available icons from lucide-react
 const availableIcons = [
@@ -205,7 +209,7 @@ const SortableProgramItem = ({
         onClick={() => toggleItem(index + 1000)}
       >
         <div className="flex items-center gap-2 flex-1">
-          <div {...attributes} {...listeners} className="cursor-grab hover:text-orange-500 text-gray-400 p-1" onClick={(e) => e.stopPropagation()}>
+          <div {...attributes} {...listeners} className="cursor-grab hover:text-[var(--primary-color)] text-gray-400 p-1" onClick={(e) => e.stopPropagation()}>
             <GripVertical className="w-5 h-5" />
           </div>
           {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
@@ -260,9 +264,11 @@ const SortableProgramItem = ({
 };
 
 export default function LayoutSettingsPage() {
+  usePageTitle('Pengaturan Layout');
+  const primaryColor = usePrimaryColor();
   const [loading, setLoading] = useState(true);
   const [allCampaigns, setAllCampaigns] = useState<any[]>([]); // Store all campaigns for selection
-  const [saving, setSaving] = useState(false);
+  const [savingSection, setSavingSection] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
@@ -416,9 +422,9 @@ export default function LayoutSettingsPage() {
     }));
   };
 
-  const handleSave = async () => {
+  const handleSave = async (section?: string) => {
     try {
-      setSaving(true);
+      setSavingSection(section || 'global');
 
       const settingsToSave = {
         ...settings,
@@ -475,7 +481,7 @@ export default function LayoutSettingsPage() {
       console.error('Error saving layout settings:', error);
       alert('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));
     } finally {
-      setSaving(false);
+      setSavingSection(null);
     }
   };
 
@@ -569,24 +575,25 @@ export default function LayoutSettingsPage() {
   const isItemExpanded = (index: number) => expandedItems.has(index);
 
   // Helper Save Button Component
-  const CardSaveButton = ({ label = "Simpan" }) => (
-    <button
-      onClick={handleSave}
-      disabled={saving}
-      className="w-full mt-6 px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-    >
-      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-      {saving ? 'Menyimpan...' : label}
-    </button>
-  );
+  const CardSaveButton = ({ section }: { section?: string }) => {
+    const isSaving = savingSection === section;
 
-  if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+      <div className="flex justify-end mt-6">
+        <button
+          onClick={() => handleSave(section)}
+          disabled={isSaving}
+          className="px-6 py-2 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+          style={{ backgroundColor: primaryColor }}
+        >
+          {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {isSaving ? 'Menyimpan...' : 'Simpan'}
+        </button>
       </div>
     );
-  }
+  };
+
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -616,8 +623,7 @@ export default function LayoutSettingsPage() {
                 <Menu className="w-6 h-6" />
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">Pengaturan Layout</h1>
-                <p className="text-sm text-gray-600">Kelola tampilan halaman utama</p>
+                {/* Title removed from here */}
               </div>
             </div>
 
@@ -640,532 +646,676 @@ export default function LayoutSettingsPage() {
 
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+          {/* Page Title (Moved from Header) */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-800">Pengaturan Layout</h1>
+            <p className="text-sm text-gray-600">Kelola tampilan halaman utama</p>
+          </div>
 
-          {/* Two Column Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
+          {loading ? (
+            <SettingsPageSkeleton />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
 
-            {/* Left Column: General Sections */}
-            <div className="space-y-6 order-2 lg:order-1">
+              {/* Left Column: General Sections */}
+              <div className="space-y-6 order-2 lg:order-1">
 
-              {/* Program Mendadak Settings */}
+                {/* Program Mendadak Settings */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
+                      <Layout className="w-5 h-5 text-pink-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-gray-800">Program Mendadak (Icons)</h3>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.program_mendadak_enabled}
+                        onChange={(e) => setSettings(prev => ({ ...prev, program_mendadak_enabled: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--primary-color)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--primary-color)]"></div>
+                    </label>
+                  </div>
+                  {settings.program_mendadak_enabled && (
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                        <input
+                          type="text"
+                          value={settings.program_mendadak_title || ''}
+                          onChange={(e) => setSettings(prev => ({ ...prev, program_mendadak_title: e.target.value }))}
+                          placeholder="Title"
+                          className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[var(--primary-color)]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-3">Items</label>
+                        <div className="space-y-3">
+                          <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                          >
+                            <SortableContext
+                              items={(settings.program_mendadak_items || []).map((item: any) => item.id)}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              {(settings.program_mendadak_items || []).map((item, index) => {
+                                const itemIndex = index + 1000;
+                                const isExpanded = isItemExpanded(itemIndex);
+                                // Ensure item has ID for fallback if random ID generation failed?
+                                // But we added IDs in fetchSettings.
+                                // If adding new item, we must ensure ID there too.
+                                return (
+                                  <SortableProgramItem
+                                    key={item.id || index}
+                                    id={item.id}
+                                    item={item}
+                                    index={index}
+                                    isExpanded={isExpanded}
+                                    toggleItem={toggleItem}
+                                    updateItem={updateProgramItem}
+                                    removeItem={removeProgramItem}
+                                    availableIcons={availableIcons}
+                                  />
+                                );
+                              })}
+                            </SortableContext>
+                          </DndContext>
+                          <button
+                            onClick={() => {
+                              const newItems = [...(settings.program_mendadak_items || []), {
+                                id: Math.random().toString(36).substr(2, 9),
+                                icon: 'heart',
+                                name: '',
+                                url: ''
+                              }];
+                              setSettings(prev => ({ ...prev, program_mendadak_items: newItems }));
+                              toggleItem(1000 + newItems.length - 1, true);
+                            }}
+                            className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-gray-600"
+                          >
+                            <Plus className="w-4 h-4" /> Tambah Program
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <CardSaveButton section="program" />
+                </div>
+
+                {/* Campaign List Settings */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      <List className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div className="flex-1"><h3 className="text-lg font-bold text-gray-800">Daftar Campaign</h3></div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" checked={settings.campaign_list_enabled} onChange={(e) => setSettings(prev => ({ ...prev, campaign_list_enabled: e.target.checked }))} className="sr-only peer" />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--primary-color)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--primary-color)]"></div>
+                    </label>
+                  </div>
+                  {settings.campaign_list_enabled && (
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                        <input type="text" value={settings.campaign_list_title || ''} onChange={(e) => setSettings(prev => ({ ...prev, campaign_list_title: e.target.value }))} className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[var(--primary-color)]" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-3">Layout</label>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2"><input type="radio" checked={settings.campaign_list_layout === 'list'} onChange={() => setSettings(prev => ({ ...prev, campaign_list_layout: 'list' }))} /> List</label>
+                          <label className="flex items-center gap-2"><input type="radio" checked={settings.campaign_list_layout === 'grid'} onChange={() => setSettings(prev => ({ ...prev, campaign_list_layout: 'grid' }))} /> Grid</label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <CardSaveButton section="campaign_list" />
+                </div>
+
+                {/* Footer Settings */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <FileTextIcon className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div className="flex-1"><h3 className="text-lg font-bold text-gray-800">Footer</h3></div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" checked={settings.footer_enabled} onChange={(e) => setSettings(prev => ({ ...prev, footer_enabled: e.target.checked }))} className="sr-only peer" />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--primary-color)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--primary-color)]"></div>
+                    </label>
+                  </div>
+                  {settings.footer_enabled && (
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Deskripsi (Bawah Logo)</label>
+                        <textarea
+                          rows={3}
+                          value={settings.footer_content?.description || ''}
+                          onChange={(e) => setSettings(prev => ({
+                            ...prev,
+                            footer_content: { ...prev.footer_content, description: e.target.value }
+                          }))}
+                          className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[var(--primary-color)]"
+                          placeholder="Deskripsi singkat yayasan..."
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Alamat</label>
+                          <textarea
+                            rows={3}
+                            value={settings.footer_content?.address || ''}
+                            onChange={(e) => setSettings(prev => ({
+                              ...prev,
+                              footer_content: { ...prev.footer_content, address: e.target.value }
+                            }))}
+                            className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[var(--primary-color)]"
+                            placeholder="Alamat lengkap..."
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">No. Telepon</label>
+                          <input
+                            type="text"
+                            value={settings.footer_content?.phone || ''}
+                            onChange={(e) => setSettings(prev => ({
+                              ...prev,
+                              footer_content: { ...prev.footer_content, phone: e.target.value }
+                            }))}
+                            className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[var(--primary-color)]"
+                            placeholder="628..."
+                          />
+                        </div>
+                      </div>
+
+                      <div className="border-t border-gray-100 pt-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Link Cepat</label>
+                        <div className="space-y-3">
+                          {(settings.footer_content?.quick_links || []).map((link: any, index: number) => (
+                            <div key={index} className="flex gap-2 items-start">
+                              <div className="w-1/3">
+                                <input
+                                  type="text"
+                                  value={link.label}
+                                  onChange={(e) => {
+                                    const newLinks = [...(settings.footer_content?.quick_links || [])];
+                                    newLinks[index] = { ...newLinks[index], label: e.target.value };
+                                    setSettings(prev => ({
+                                      ...prev,
+                                      footer_content: { ...prev.footer_content, quick_links: newLinks }
+                                    }));
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                                  placeholder="Label"
+                                />
+                              </div>
+                              <div className="w-1/3">
+                                <input
+                                  type="text"
+                                  value={link.url}
+                                  onChange={(e) => {
+                                    const newLinks = [...(settings.footer_content?.quick_links || [])];
+                                    newLinks[index] = { ...newLinks[index], url: e.target.value };
+                                    setSettings(prev => ({
+                                      ...prev,
+                                      footer_content: { ...prev.footer_content, quick_links: newLinks }
+                                    }));
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                                  placeholder="URL"
+                                />
+                              </div>
+                              <div className="w-1/4">
+                                <select
+                                  value={link.icon || 'Link'}
+                                  onChange={(e) => {
+                                    const newLinks = [...(settings.footer_content?.quick_links || [])];
+                                    newLinks[index] = { ...newLinks[index], icon: e.target.value };
+                                    setSettings(prev => ({
+                                      ...prev,
+                                      footer_content: { ...prev.footer_content, quick_links: newLinks }
+                                    }));
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                                >
+                                  <option value="Link">Link</option>
+                                  <option value="Home">Home</option>
+                                  <option value="Heart">Heart</option>
+                                  <option value="HelpCircle">Help</option>
+                                  <option value="Phone">Phone</option>
+                                  <option value="Info">Info</option>
+                                  <option value="FileText">File</option>
+                                  <option value="Mail">Mail</option>
+                                  <option value="Gift">Gift</option>
+                                </select>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const newLinks = (settings.footer_content?.quick_links || []).filter((_: any, i: number) => i !== index);
+                                  setSettings(prev => ({
+                                    ...prev,
+                                    footer_content: { ...prev.footer_content, quick_links: newLinks }
+                                  }));
+                                }}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            onClick={() => {
+                              const newLinks = [...(settings.footer_content?.quick_links || []), { label: '', url: '' }];
+                              setSettings(prev => ({
+                                ...prev,
+                                footer_content: { ...prev.footer_content, quick_links: newLinks }
+                              }));
+                            }}
+                            className="text-sm text-theme-orange font-medium flex items-center gap-1 hover:underline"
+                          >
+                            <Plus className="w-4 h-4" /> Tambah Link
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <CardSaveButton section="footer" />
+                </div>
+              </div>
+
+
+              {/* Campaign Slider Settings (NEW) */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
-                    <Layout className="w-5 h-5 text-pink-600" />
+                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <Target className="w-5 h-5 text-indigo-600" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-800">Program Mendadak (Icons)</h3>
+                    <h3 className="text-lg font-bold text-gray-800">Campaign Slider (Pilihan Donasiku)</h3>
+                    <p className="text-xs text-gray-500">Atur judul dan pilih campaign yang muncul.</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={settings.program_mendadak_enabled}
-                      onChange={(e) => setSettings(prev => ({ ...prev, program_mendadak_enabled: e.target.checked }))}
+                      checked={settings.campaign_slider_enabled}
+                      onChange={(e) => setSettings(prev => ({ ...prev, campaign_slider_enabled: e.target.checked }))}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--primary-color)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--primary-color)]"></div>
                   </label>
                 </div>
-                {settings.program_mendadak_enabled && (
+                {settings.campaign_slider_enabled && (
                   <div className="space-y-4 mt-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Title Section</label>
                       <input
                         type="text"
-                        value={settings.program_mendadak_title || ''}
-                        onChange={(e) => setSettings(prev => ({ ...prev, program_mendadak_title: e.target.value }))}
-                        placeholder="Title"
-                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
+                        value={settings.campaign_slider_title || ''}
+                        onChange={(e) => setSettings(prev => ({ ...prev, campaign_slider_title: e.target.value }))}
+                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[var(--primary-color)]"
+                        placeholder="Contoh: Pilihan Donasiku"
                       />
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">Items</label>
-                      <div className="space-y-3">
-                        <DndContext
-                          sensors={sensors}
-                          collisionDetection={closestCenter}
-                          onDragEnd={handleDragEnd}
-                        >
-                          <SortableContext
-                            items={(settings.program_mendadak_items || []).map((item: any) => item.id)}
-                            strategy={verticalListSortingStrategy}
-                          >
-                            {(settings.program_mendadak_items || []).map((item, index) => {
-                              const itemIndex = index + 1000;
-                              const isExpanded = isItemExpanded(itemIndex);
-                              // Ensure item has ID for fallback if random ID generation failed?
-                              // But we added IDs in fetchSettings.
-                              // If adding new item, we must ensure ID there too.
-                              return (
-                                <SortableProgramItem
-                                  key={item.id || index}
-                                  id={item.id}
-                                  item={item}
-                                  index={index}
-                                  isExpanded={isExpanded}
-                                  toggleItem={toggleItem}
-                                  updateItem={updateProgramItem}
-                                  removeItem={removeProgramItem}
-                                  availableIcons={availableIcons}
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Campaign ({settings.campaign_slider_ids?.length || 0})</label>
+                      <div className="max-h-60 overflow-y-auto border-2 border-gray-200 rounded-lg p-2 space-y-1">
+                        {allCampaigns.map(campaign => {
+                          const isSelected = (settings.campaign_slider_ids || []).includes(campaign.id);
+                          return (
+                            <div
+                              key={campaign.id}
+                              onClick={() => {
+                                setSettings(prev => {
+                                  const currentIds = prev.campaign_slider_ids || [];
+                                  if (isSelected) {
+                                    return { ...prev, campaign_slider_ids: currentIds.filter(id => id !== campaign.id) };
+                                  } else {
+                                    return { ...prev, campaign_slider_ids: [...currentIds, campaign.id] };
+                                  }
+                                });
+                              }}
+                              className={`flex items-center gap-3 p-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-gray-50 border border-transparent'}`}
+                            >
+                              <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
+                                {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                              </div>
+                              {campaign.image_url && <img src={campaign.image_url} className="w-8 h-8 rounded object-cover" />}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">{campaign.title}</p>
+                                <p className="text-xs text-gray-500 truncate">{campaign.organization_name}</p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {allCampaigns.length === 0 && <p className="text-sm text-gray-500 p-2 text-center">Belum ada campaign published.</p>}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">Klik untuk memilih/menghapus campaign.</p>
+                    </div>
+                  </div>
+                )}
+                <CardSaveButton section="campaign_slider" />
+              </div>
+
+              {/* Campaign Slider 2 Settings (NEW) */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <Target className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-gray-800">Campaign Slider 2 (Bawah)</h3>
+                    <p className="text-xs text-gray-500">Atur judul dan pilih campaign untuk slider kedua.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.campaign_slider_2_enabled}
+                      onChange={(e) => setSettings(prev => ({ ...prev, campaign_slider_2_enabled: e.target.checked }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--primary-color)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--primary-color)]"></div>
+                  </label>
+                </div>
+                {settings.campaign_slider_2_enabled && (
+                  <div className="space-y-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Title Section</label>
+                      <input
+                        type="text"
+                        value={settings.campaign_slider_2_title || ''}
+                        onChange={(e) => setSettings(prev => ({ ...prev, campaign_slider_2_title: e.target.value }))}
+                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[var(--primary-color)]"
+                        placeholder="Contoh: Pilihan Donasiku"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Campaign ({settings.campaign_slider_2_ids?.length || 0})</label>
+                      <div className="max-h-60 overflow-y-auto border-2 border-gray-200 rounded-lg p-2 space-y-1">
+                        {allCampaigns.map(campaign => {
+                          const isSelected = (settings.campaign_slider_2_ids || []).includes(campaign.id);
+                          return (
+                            <div
+                              key={campaign.id}
+                              onClick={() => {
+                                setSettings(prev => {
+                                  const currentIds = prev.campaign_slider_2_ids || [];
+                                  if (isSelected) {
+                                    return { ...prev, campaign_slider_2_ids: currentIds.filter(id => id !== campaign.id) };
+                                  } else {
+                                    return { ...prev, campaign_slider_2_ids: [...currentIds, campaign.id] };
+                                  }
+                                });
+                              }}
+                              className={`flex items-center gap-3 p-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-gray-50 border border-transparent'}`}
+                            >
+                              <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
+                                {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                              </div>
+                              {campaign.image_url && <img src={campaign.image_url} className="w-8 h-8 rounded object-cover" />}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">{campaign.title}</p>
+                                <p className="text-xs text-gray-500 truncate">{campaign.organization_name}</p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {allCampaigns.length === 0 && <p className="text-sm text-gray-500 p-2 text-center">Belum ada campaign published.</p>}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">Klik untuk memilih/menghapus campaign.</p>
+                    </div>
+                  </div>
+                )}
+                <CardSaveButton section="campaign_slider_2" />
+              </div>
+
+              {/* Right Column: Slider Settings */}
+              <div className="space-y-6 order-1 lg:order-2">
+
+                {/* Hero Slider Settings */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Image className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-gray-800">Hero Slider (Top)</h3>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.hero_slider_enabled}
+                        onChange={(e) => setSettings(prev => ({ ...prev, hero_slider_enabled: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--primary-color)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--primary-color)]"></div>
+                    </label>
+                  </div>
+                  {settings.hero_slider_enabled && (
+                    <div className="space-y-4 mt-4">
+                      {settings.hero_slider_items.map((item, index) => {
+                        const isExpanded = isItemExpanded(index);
+                        return (
+                          <div key={index} className="border-2 border-gray-200 rounded-lg overflow-hidden">
+                            <div
+                              className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => toggleItem(index)}
+                            >
+                              <div className="flex items-center gap-3">
+                                {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
+                                <h4 className="font-semibold text-gray-700">Slide {index + 1}</h4>
+                              </div>
+                              <button onClick={(e) => { e.stopPropagation(); removeSliderItem('hero', index); }} className="text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                            {isExpanded && (
+                              <div className="p-4 space-y-3">
+                                <ImageUpload
+                                  label="Gambar"
+                                  value={item.image}
+                                  onChange={(url) => updateSliderItem('hero', index, 'image', url)}
+                                  folder="hero-slider"
+                                  height="h-48"
+                                  placeholder="Upload gambar"
                                 />
-                              );
-                            })}
-                          </SortableContext>
-                        </DndContext>
-                        <button
-                          onClick={() => {
-                            const newItems = [...(settings.program_mendadak_items || []), {
-                              id: Math.random().toString(36).substr(2, 9),
-                              icon: 'heart',
-                              name: '',
-                              url: ''
-                            }];
-                            setSettings(prev => ({ ...prev, program_mendadak_items: newItems }));
-                            toggleItem(1000 + newItems.length - 1, true);
-                          }}
-                          className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-gray-600"
-                        >
-                          <Plus className="w-4 h-4" /> Tambah Program
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <CardSaveButton label="Simpan Program" />
-              </div>
-
-              {/* Campaign List Settings */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <List className="w-5 h-5 text-green-600" />
-                  </div>
-                  <div className="flex-1"><h3 className="text-lg font-bold text-gray-800">Daftar Campaign</h3></div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={settings.campaign_list_enabled} onChange={(e) => setSettings(prev => ({ ...prev, campaign_list_enabled: e.target.checked }))} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                  </label>
-                </div>
-                {settings.campaign_list_enabled && (
-                  <div className="space-y-4 mt-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
-                      <input type="text" value={settings.campaign_list_title || ''} onChange={(e) => setSettings(prev => ({ ...prev, campaign_list_title: e.target.value }))} className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">Layout</label>
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2"><input type="radio" checked={settings.campaign_list_layout === 'list'} onChange={() => setSettings(prev => ({ ...prev, campaign_list_layout: 'list' }))} /> List</label>
-                        <label className="flex items-center gap-2"><input type="radio" checked={settings.campaign_list_layout === 'grid'} onChange={() => setSettings(prev => ({ ...prev, campaign_list_layout: 'grid' }))} /> Grid</label>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <CardSaveButton label="Simpan Campaign List" />
-              </div>
-
-              {/* Footer Settings */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <FileTextIcon className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <div className="flex-1"><h3 className="text-lg font-bold text-gray-800">Footer</h3></div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={settings.footer_enabled} onChange={(e) => setSettings(prev => ({ ...prev, footer_enabled: e.target.checked }))} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                  </label>
-                </div>
-                <CardSaveButton label="Simpan Footer" />
-              </div>
-            </div>
-
-
-            {/* Campaign Slider Settings (NEW) */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <Target className="w-5 h-5 text-indigo-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-gray-800">Campaign Slider (Pilihan Donasiku)</h3>
-                  <p className="text-xs text-gray-500">Atur judul dan pilih campaign yang muncul.</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.campaign_slider_enabled}
-                    onChange={(e) => setSettings(prev => ({ ...prev, campaign_slider_enabled: e.target.checked }))}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                </label>
-              </div>
-              {settings.campaign_slider_enabled && (
-                <div className="space-y-4 mt-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Title Section</label>
-                    <input
-                      type="text"
-                      value={settings.campaign_slider_title || ''}
-                      onChange={(e) => setSettings(prev => ({ ...prev, campaign_slider_title: e.target.value }))}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
-                      placeholder="Contoh: Pilihan Donasiku"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Campaign ({settings.campaign_slider_ids?.length || 0})</label>
-                    <div className="max-h-60 overflow-y-auto border-2 border-gray-200 rounded-lg p-2 space-y-1">
-                      {allCampaigns.map(campaign => {
-                        const isSelected = (settings.campaign_slider_ids || []).includes(campaign.id);
-                        return (
-                          <div
-                            key={campaign.id}
-                            onClick={() => {
-                              setSettings(prev => {
-                                const currentIds = prev.campaign_slider_ids || [];
-                                if (isSelected) {
-                                  return { ...prev, campaign_slider_ids: currentIds.filter(id => id !== campaign.id) };
-                                } else {
-                                  return { ...prev, campaign_slider_ids: [...currentIds, campaign.id] };
-                                }
-                              });
-                            }}
-                            className={`flex items-center gap-3 p-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-gray-50 border border-transparent'}`}
-                          >
-                            <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
-                              {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
-                            </div>
-                            {campaign.image_url && <img src={campaign.image_url} className="w-8 h-8 rounded object-cover" />}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">{campaign.title}</p>
-                              <p className="text-xs text-gray-500 truncate">{campaign.organization_name}</p>
-                            </div>
+                                <input value={item.title} onChange={(e) => updateSliderItem('hero', index, 'title', e.target.value)} placeholder="Judul" className="w-full px-4 py-2 border rounded-lg" />
+                                <input value={item.subtitle || ''} onChange={(e) => updateSliderItem('hero', index, 'subtitle', e.target.value)} placeholder="Subtitle" className="w-full px-4 py-2 border rounded-lg" />
+                                <textarea value={item.description || ''} onChange={(e) => updateSliderItem('hero', index, 'description', e.target.value)} placeholder="Description" className="w-full px-4 py-2 border rounded-lg" />
+                                <div className="grid grid-cols-2 gap-2">
+                                  <input value={item.buttonText || ''} onChange={(e) => updateSliderItem('hero', index, 'buttonText', e.target.value)} placeholder="Button Text" className="w-full px-4 py-2 border rounded-lg" />
+                                  <input value={item.buttonLink || ''} onChange={(e) => updateSliderItem('hero', index, 'buttonLink', e.target.value)} placeholder="Link" className="w-full px-4 py-2 border rounded-lg" />
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )
+                        );
                       })}
-                      {allCampaigns.length === 0 && <p className="text-sm text-gray-500 p-2 text-center">Belum ada campaign published.</p>}
+                      <button onClick={() => addSliderItem('hero')} className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-gray-600"><Plus className="w-4 h-4" /> Tambah Slide</button>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">Klik untuk memilih/menghapus campaign.</p>
-                  </div>
+                  )}
+                  <CardSaveButton section="hero_slider" />
                 </div>
-              )}
-              <CardSaveButton label="Simpan Campaign Slider" />
-            </div>
 
-            {/* Campaign Slider 2 Settings (NEW) */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <Target className="w-5 h-5 text-indigo-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-gray-800">Campaign Slider 2 (Bawah)</h3>
-                  <p className="text-xs text-gray-500">Atur judul dan pilih campaign untuk slider kedua.</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.campaign_slider_2_enabled}
-                    onChange={(e) => setSettings(prev => ({ ...prev, campaign_slider_2_enabled: e.target.checked }))}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                </label>
-              </div>
-              {settings.campaign_slider_2_enabled && (
-                <div className="space-y-4 mt-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Title Section</label>
-                    <input
-                      type="text"
-                      value={settings.campaign_slider_2_title || ''}
-                      onChange={(e) => setSettings(prev => ({ ...prev, campaign_slider_2_title: e.target.value }))}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
-                      placeholder="Contoh: Pilihan Donasiku"
-                    />
+                {/* Promo / Spesial Buat Kamu Slider Settings */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <Megaphone className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-gray-800">Slider "Spesial Buat Kamu"</h3>
+                      <p className="text-xs text-gray-500">Slider promosi/khusus (Tengah)</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.promo_slider_enabled}
+                        onChange={(e) => setSettings(prev => ({ ...prev, promo_slider_enabled: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--primary-color)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--primary-color)]"></div>
+                    </label>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Campaign ({settings.campaign_slider_2_ids?.length || 0})</label>
-                    <div className="max-h-60 overflow-y-auto border-2 border-gray-200 rounded-lg p-2 space-y-1">
-                      {allCampaigns.map(campaign => {
-                        const isSelected = (settings.campaign_slider_2_ids || []).includes(campaign.id);
+                  {settings.promo_slider_enabled && (
+                    <div className="space-y-4 mt-4">
+                      {(settings.promo_slider_items || []).map((item, index) => {
+                        const itemIndex = index + 2000;
+                        const isExpanded = isItemExpanded(itemIndex);
                         return (
-                          <div
-                            key={campaign.id}
-                            onClick={() => {
-                              setSettings(prev => {
-                                const currentIds = prev.campaign_slider_2_ids || [];
-                                if (isSelected) {
-                                  return { ...prev, campaign_slider_2_ids: currentIds.filter(id => id !== campaign.id) };
-                                } else {
-                                  return { ...prev, campaign_slider_2_ids: [...currentIds, campaign.id] };
-                                }
-                              });
-                            }}
-                            className={`flex items-center gap-3 p-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-gray-50 border border-transparent'}`}
-                          >
-                            <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
-                              {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                          <div key={index} className="border-2 border-gray-200 rounded-lg overflow-hidden">
+                            <div
+                              className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => toggleItem(itemIndex)}
+                            >
+                              <div className="flex items-center gap-3">
+                                {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
+                                <h4 className="font-semibold text-gray-700">{item.title || `Promo ${index + 1}`}</h4>
+                              </div>
+                              <button onClick={(e) => { e.stopPropagation(); removeSliderItem('promo', index); }} className="text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
                             </div>
-                            {campaign.image_url && <img src={campaign.image_url} className="w-8 h-8 rounded object-cover" />}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">{campaign.title}</p>
-                              <p className="text-xs text-gray-500 truncate">{campaign.organization_name}</p>
-                            </div>
+                            {isExpanded && (
+                              <div className="p-4 space-y-3">
+                                <ImageUpload
+                                  label="Gambar Background"
+                                  value={item.image}
+                                  onChange={(url) => updateSliderItem('promo', index, 'image', url)}
+                                  folder="promo-slider"
+                                  height="h-32"
+                                  placeholder="Upload gambar"
+                                />
+                                <input value={item.title || ''} onChange={(e) => updateSliderItem('promo', index, 'title', e.target.value)} placeholder="Judul Promo" className="w-full px-4 py-2 border rounded-lg" />
+                                <input value={item.subtitle || ''} onChange={(e) => updateSliderItem('promo', index, 'subtitle', e.target.value)} placeholder="Subtitle" className="w-full px-4 py-2 border rounded-lg" />
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-xs text-gray-500 mb-1 block">Button Text</label>
+                                    <input value={item.buttonText || ''} onChange={(e) => updateSliderItem('promo', index, 'buttonText', e.target.value)} placeholder="Cek Sekarang" className="w-full px-4 py-2 border rounded-lg" />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-gray-500 mb-1 block">Link</label>
+                                    <input value={item.buttonLink || ''} onChange={(e) => updateSliderItem('promo', index, 'buttonLink', e.target.value)} placeholder="/link" className="w-full px-4 py-2 border rounded-lg" />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="text-xs text-gray-500 mb-1 block">Tema Warna</label>
+                                  <select
+                                    value={item.theme || 'pink'}
+                                    onChange={(e) => updateSliderItem('promo', index, 'theme', e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                  >
+                                    <option value="pink">Pink (Baby/Love)</option>
+                                    <option value="green">Green (Zakat/Help)</option>
+                                    <option value="blue">Blue (General)</option>
+                                    <option value="orange">Orange (Primary)</option>
+                                  </select>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )
+                        );
                       })}
-                      {allCampaigns.length === 0 && <p className="text-sm text-gray-500 p-2 text-center">Belum ada campaign published.</p>}
+                      <button onClick={() => addSliderItem('promo')} className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-gray-600"><Plus className="w-4 h-4" /> Tambah Promo</button>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">Klik untuk memilih/menghapus campaign.</p>
-                  </div>
+                  )}
+                  <CardSaveButton section="promo_slider" />
                 </div>
-              )}
-              <CardSaveButton label="Simpan Campaign Slider 2" />
-            </div>
 
-            {/* Right Column: Slider Settings */}
-            <div className="space-y-6 order-1 lg:order-2">
-
-              {/* Hero Slider Settings */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Image className="w-5 h-5 text-blue-600" />
+                {/* CTA Slider Settings (NEW) */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
+                      <Zap className="w-5 h-5 text-pink-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-gray-800">Slider CTA (Bawah)</h3>
+                      <p className="text-xs text-gray-500">Slider ajakan donasi / urgent (Pink Theme)</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.cta_slider_enabled}
+                        onChange={(e) => setSettings(prev => ({ ...prev, cta_slider_enabled: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--primary-color)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--primary-color)]"></div>
+                    </label>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-800">Hero Slider (Top)</h3>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.hero_slider_enabled}
-                      onChange={(e) => setSettings(prev => ({ ...prev, hero_slider_enabled: e.target.checked }))}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                  </label>
-                </div>
-                {settings.hero_slider_enabled && (
-                  <div className="space-y-4 mt-4">
-                    {settings.hero_slider_items.map((item, index) => {
-                      const isExpanded = isItemExpanded(index);
-                      return (
-                        <div key={index} className="border-2 border-gray-200 rounded-lg overflow-hidden">
-                          <div
-                            className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
-                            onClick={() => toggleItem(index)}
-                          >
-                            <div className="flex items-center gap-3">
-                              {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
-                              <h4 className="font-semibold text-gray-700">Slide {index + 1}</h4>
+                  {settings.cta_slider_enabled && (
+                    <div className="space-y-4 mt-4">
+                      {(settings.cta_slider_items || []).map((item, index) => {
+                        const itemIndex = index + 3000;
+                        const isExpanded = isItemExpanded(itemIndex);
+                        return (
+                          <div key={index} className="border-2 border-gray-200 rounded-lg overflow-hidden">
+                            <div
+                              className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => toggleItem(itemIndex)}
+                            >
+                              <div className="flex items-center gap-3">
+                                {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
+                                <h4 className="font-semibold text-gray-700">{item.title || `Slide ${index + 1}`}</h4>
+                              </div>
+                              <button onClick={(e) => { e.stopPropagation(); removeSliderItem('cta', index); }} className="text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); removeSliderItem('hero', index); }} className="text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
+                            {isExpanded && (
+                              <div className="p-4 space-y-3">
+                                <ImageUpload
+                                  label="Gambar Background"
+                                  value={item.image}
+                                  onChange={(url) => updateSliderItem('cta', index, 'image', url)}
+                                  folder="cta-slider"
+                                  height="h-32"
+                                  placeholder="Upload gambar"
+                                />
+                                <input value={item.title || ''} onChange={(e) => updateSliderItem('cta', index, 'title', e.target.value)} placeholder="Judul CTA" className="w-full px-4 py-2 border rounded-lg" />
+                                <input value={item.subtitle || ''} onChange={(e) => updateSliderItem('cta', index, 'subtitle', e.target.value)} placeholder="Subtitle" className="w-full px-4 py-2 border rounded-lg" />
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-xs text-gray-500 mb-1 block">Button Text</label>
+                                    <input value={item.buttonText || ''} onChange={(e) => updateSliderItem('cta', index, 'buttonText', e.target.value)} placeholder="Donasi Sekarang" className="w-full px-4 py-2 border rounded-lg" />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-gray-500 mb-1 block">Link</label>
+                                    <input value={item.buttonLink || ''} onChange={(e) => updateSliderItem('cta', index, 'buttonLink', e.target.value)} placeholder="/donasi" className="w-full px-4 py-2 border rounded-lg" />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="text-xs text-gray-500 mb-1 block">Tema Warna</label>
+                                  <select
+                                    value={item.theme || 'pink'}
+                                    onChange={(e) => updateSliderItem('cta', index, 'theme', e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                  >
+                                    <option value="pink">Pink (Baby/Love)</option>
+                                    <option value="green">Green (Zakat/Help)</option>
+                                    <option value="blue">Blue (General)</option>
+                                    <option value="orange">Orange (Primary)</option>
+                                  </select>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          {isExpanded && (
-                            <div className="p-4 space-y-3">
-                              <ImageUpload
-                                label="Gambar"
-                                value={item.image}
-                                onChange={(url) => updateSliderItem('hero', index, 'image', url)}
-                                folder="hero-slider"
-                                height="h-48"
-                                placeholder="Upload gambar"
-                              />
-                              <input value={item.title} onChange={(e) => updateSliderItem('hero', index, 'title', e.target.value)} placeholder="Judul" className="w-full px-4 py-2 border rounded-lg" />
-                              <input value={item.subtitle || ''} onChange={(e) => updateSliderItem('hero', index, 'subtitle', e.target.value)} placeholder="Subtitle" className="w-full px-4 py-2 border rounded-lg" />
-                              <textarea value={item.description || ''} onChange={(e) => updateSliderItem('hero', index, 'description', e.target.value)} placeholder="Description" className="w-full px-4 py-2 border rounded-lg" />
-                              <div className="grid grid-cols-2 gap-2">
-                                <input value={item.buttonText || ''} onChange={(e) => updateSliderItem('hero', index, 'buttonText', e.target.value)} placeholder="Button Text" className="w-full px-4 py-2 border rounded-lg" />
-                                <input value={item.buttonLink || ''} onChange={(e) => updateSliderItem('hero', index, 'buttonLink', e.target.value)} placeholder="Link" className="w-full px-4 py-2 border rounded-lg" />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    <button onClick={() => addSliderItem('hero')} className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-gray-600"><Plus className="w-4 h-4" /> Tambah Slide</button>
-                  </div>
-                )}
-                <CardSaveButton label="Simpan Hero Slider" />
-              </div>
-
-              {/* Promo / Spesial Buat Kamu Slider Settings */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <Megaphone className="w-5 h-5 text-orange-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-800">Slider "Spesial Buat Kamu"</h3>
-                    <p className="text-xs text-gray-500">Slider promosi/khusus (Tengah)</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.promo_slider_enabled}
-                      onChange={(e) => setSettings(prev => ({ ...prev, promo_slider_enabled: e.target.checked }))}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                  </label>
+                        );
+                      })}
+                      <button onClick={() => addSliderItem('cta')} className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-gray-600"><Plus className="w-4 h-4" /> Tambah CTA Slide</button>
+                    </div>
+                  )}
+                  <CardSaveButton section="cta_slider" />
                 </div>
-                {settings.promo_slider_enabled && (
-                  <div className="space-y-4 mt-4">
-                    {(settings.promo_slider_items || []).map((item, index) => {
-                      const itemIndex = index + 2000;
-                      const isExpanded = isItemExpanded(itemIndex);
-                      return (
-                        <div key={index} className="border-2 border-gray-200 rounded-lg overflow-hidden">
-                          <div
-                            className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
-                            onClick={() => toggleItem(itemIndex)}
-                          >
-                            <div className="flex items-center gap-3">
-                              {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
-                              <h4 className="font-semibold text-gray-700">{item.title || `Promo ${index + 1}`}</h4>
-                            </div>
-                            <button onClick={(e) => { e.stopPropagation(); removeSliderItem('promo', index); }} className="text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
-                          </div>
-                          {isExpanded && (
-                            <div className="p-4 space-y-3">
-                              <ImageUpload
-                                label="Gambar Background"
-                                value={item.image}
-                                onChange={(url) => updateSliderItem('promo', index, 'image', url)}
-                                folder="promo-slider"
-                                height="h-32"
-                                placeholder="Upload gambar"
-                              />
-                              <input value={item.title || ''} onChange={(e) => updateSliderItem('promo', index, 'title', e.target.value)} placeholder="Judul Promo" className="w-full px-4 py-2 border rounded-lg" />
-                              <input value={item.subtitle || ''} onChange={(e) => updateSliderItem('promo', index, 'subtitle', e.target.value)} placeholder="Subtitle" className="w-full px-4 py-2 border rounded-lg" />
 
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="text-xs text-gray-500 mb-1 block">Button Text</label>
-                                  <input value={item.buttonText || ''} onChange={(e) => updateSliderItem('promo', index, 'buttonText', e.target.value)} placeholder="Cek Sekarang" className="w-full px-4 py-2 border rounded-lg" />
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-500 mb-1 block">Link</label>
-                                  <input value={item.buttonLink || ''} onChange={(e) => updateSliderItem('promo', index, 'buttonLink', e.target.value)} placeholder="/link" className="w-full px-4 py-2 border rounded-lg" />
-                                </div>
-                              </div>
-
-                              <div>
-                                <label className="text-xs text-gray-500 mb-1 block">Tema Warna</label>
-                                <select
-                                  value={item.theme || 'pink'}
-                                  onChange={(e) => updateSliderItem('promo', index, 'theme', e.target.value)}
-                                  className="w-full px-4 py-2 border rounded-lg"
-                                >
-                                  <option value="pink">Pink (Baby/Love)</option>
-                                  <option value="green">Green (Zakat/Help)</option>
-                                  <option value="blue">Blue (General)</option>
-                                  <option value="orange">Orange (Primary)</option>
-                                </select>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    <button onClick={() => addSliderItem('promo')} className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-gray-600"><Plus className="w-4 h-4" /> Tambah Promo</button>
-                  </div>
-                )}
-                <CardSaveButton label="Simpan Promo Slider" />
-              </div>
-
-              {/* CTA Slider Settings (NEW) */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
-                    <Zap className="w-5 h-5 text-pink-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-800">Slider CTA (Bawah)</h3>
-                    <p className="text-xs text-gray-500">Slider ajakan donasi / urgent (Pink Theme)</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.cta_slider_enabled}
-                      onChange={(e) => setSettings(prev => ({ ...prev, cta_slider_enabled: e.target.checked }))}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                  </label>
-                </div>
-                {settings.cta_slider_enabled && (
-                  <div className="space-y-4 mt-4">
-                    {(settings.cta_slider_items || []).map((item, index) => {
-                      const itemIndex = index + 3000;
-                      const isExpanded = isItemExpanded(itemIndex);
-                      return (
-                        <div key={index} className="border-2 border-gray-200 rounded-lg overflow-hidden">
-                          <div
-                            className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
-                            onClick={() => toggleItem(itemIndex)}
-                          >
-                            <div className="flex items-center gap-3">
-                              {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
-                              <h4 className="font-semibold text-gray-700">{item.title || `Slide ${index + 1}`}</h4>
-                            </div>
-                            <button onClick={(e) => { e.stopPropagation(); removeSliderItem('cta', index); }} className="text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
-                          </div>
-                          {isExpanded && (
-                            <div className="p-4 space-y-3">
-                              <ImageUpload
-                                label="Gambar Background"
-                                value={item.image}
-                                onChange={(url) => updateSliderItem('cta', index, 'image', url)}
-                                folder="cta-slider"
-                                height="h-32"
-                                placeholder="Upload gambar"
-                              />
-                              <input value={item.title || ''} onChange={(e) => updateSliderItem('cta', index, 'title', e.target.value)} placeholder="Judul CTA" className="w-full px-4 py-2 border rounded-lg" />
-                              <input value={item.subtitle || ''} onChange={(e) => updateSliderItem('cta', index, 'subtitle', e.target.value)} placeholder="Subtitle" className="w-full px-4 py-2 border rounded-lg" />
-
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="text-xs text-gray-500 mb-1 block">Button Text</label>
-                                  <input value={item.buttonText || ''} onChange={(e) => updateSliderItem('cta', index, 'buttonText', e.target.value)} placeholder="Donasi Sekarang" className="w-full px-4 py-2 border rounded-lg" />
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-500 mb-1 block">Link</label>
-                                  <input value={item.buttonLink || ''} onChange={(e) => updateSliderItem('cta', index, 'buttonLink', e.target.value)} placeholder="/donasi" className="w-full px-4 py-2 border rounded-lg" />
-                                </div>
-                              </div>
-
-                              <div>
-                                <label className="text-xs text-gray-500 mb-1 block">Tema Warna</label>
-                                <select
-                                  value={item.theme || 'pink'}
-                                  onChange={(e) => updateSliderItem('cta', index, 'theme', e.target.value)}
-                                  className="w-full px-4 py-2 border rounded-lg"
-                                >
-                                  <option value="pink">Pink (Baby/Love)</option>
-                                  <option value="green">Green (Zakat/Help)</option>
-                                  <option value="blue">Blue (General)</option>
-                                  <option value="orange">Orange (Primary)</option>
-                                </select>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    <button onClick={() => addSliderItem('cta')} className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-gray-600"><Plus className="w-4 h-4" /> Tambah CTA Slide</button>
-                  </div>
-                )}
-                <CardSaveButton label="Simpan CTA Slider" />
               </div>
 
             </div>
-
-          </div>
+          )}
         </div>
       </div>
     </div>

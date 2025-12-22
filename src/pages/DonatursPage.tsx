@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
 import { useAppName } from '../hooks/useAppName';
 import { TableSkeleton } from '../components/SkeletonLoader';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface Donor {
     customer_name: string;
@@ -18,6 +19,7 @@ interface Donor {
 }
 
 export default function DonatursPage() {
+    usePageTitle('Data Donatur');
     const navigate = useNavigate();
     const { appName } = useAppName();
     const [donors, setDonors] = useState<Donor[]>([]);
@@ -167,8 +169,7 @@ export default function DonatursPage() {
                                 <Menu className="w-6 h-6" />
                             </button>
                             <div>
-                                <h1 className="text-2xl font-bold text-gray-800">Data Donatur</h1>
-                                <p className="text-sm text-gray-600">Kelola data donatur</p>
+                                {/* Title removed from here */}
                             </div>
                         </div>
 
@@ -192,6 +193,12 @@ export default function DonatursPage() {
                 {/* Main Content */}
                 {/* Main Content */}
                 <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+                    {/* Page Title (Moved from Header) */}
+                    <div className="mb-6">
+                        <h1 className="text-2xl font-bold text-gray-800">Data Donatur</h1>
+                        <p className="text-sm text-gray-600">Kelola data donatur</p>
+                    </div>
+
                     {/* Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">

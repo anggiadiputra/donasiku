@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, Bell, Menu } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Sidebar from './Sidebar';
-import { useAppName } from '../hooks/useAppName';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -11,7 +10,6 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
-  const { appName } = useAppName();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -23,9 +21,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       navigate('/login');
     }
   };
-
-  // Get first letter of app name for icon
-  const appInitial = appName.charAt(0).toUpperCase();
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -62,12 +57,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 >
                   <Menu className="w-6 h-6 text-gray-700" />
                 </button>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-                    <span className="text-white font-bold text-lg">{appInitial}</span>
-                  </div>
-                  <h1 className="text-lg font-bold text-gray-800 line-clamp-1">{appName}</h1>
-                </div>
               </div>
               <div className="flex items-center gap-2">
                 <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">

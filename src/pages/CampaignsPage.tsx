@@ -5,8 +5,11 @@ import Sidebar from '../components/Sidebar';
 import { useAppName } from '../hooks/useAppName';
 import { supabase, Campaign } from '../lib/supabase';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
+import { TableSkeleton } from '../components/SkeletonLoader';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function CampaignsPage() {
+  usePageTitle('Data Campaign');
   const navigate = useNavigate();
   const { appName } = useAppName();
   const primaryColor = usePrimaryColor();
@@ -146,6 +149,52 @@ export default function CampaignsPage() {
     if (confirm(`Apakah Anda yakin ingin menghapus campaign "${title}"?`)) {
       try {
         setLoading(true);
+
+        // 1. Fetch campaign to get image_url
+        const { data: campaign, error: fetchError } = await supabase
+          .from('campaigns')
+          .select('image_url')
+          .eq('id', id)
+          .single();
+
+        if (fetchError) {
+          console.error('Error fetching campaign for deletion:', fetchError);
+          // Proceed with deletion anyway if fetch fails, or throw? 
+          // Better to try delete record if we can't find it
+        }
+
+        // 2. Delete image from storage if exists
+        if (campaign?.image_url) {
+          try {
+            // Extract file path from URL
+            // URL format: .../storage/v1/object/public/campaigns/folder/filename.jpg
+            // or .../storage/v1/object/public/campaigns/filename.jpg
+            const url = new URL(campaign.image_url);
+            const pathParts = url.pathname.split('/campaigns/');
+            if (pathParts.length > 1) {
+              const filePath = pathParts[1]; // content after /campaigns/
+              // Decode URI component to handle spaces/special chars if any
+              const decodedPath = decodeURIComponent(filePath);
+
+              console.log('Attempting to delete image:', decodedPath);
+              const { error: storageError } = await supabase
+                .storage
+                .from('campaigns')
+                .remove([decodedPath]);
+
+              if (storageError) {
+                console.error('Error deleting image from storage:', storageError);
+                // Don't block campaign deletion, just log error
+              } else {
+                console.log('Image deleted successfully');
+              }
+            }
+          } catch (urlError) {
+            console.error('Error parsing image URL:', urlError);
+          }
+        }
+
+        // 3. Delete campaign record
         const { error } = await supabase
           .from('campaigns')
           .delete()
@@ -154,7 +203,7 @@ export default function CampaignsPage() {
         if (error) throw error;
 
         await fetchCampaigns();
-        alert('Campaign berhasil dihapus');
+        alert('Campaign dan gambarnya berhasil dihapus');
       } catch (error: any) {
         console.error('Error deleting campaign:', error);
         alert('Gagal menghapus campaign: ' + error.message);
@@ -277,28 +326,32 @@ export default function CampaignsPage() {
                 </div>
 
                 {/* Table */}
-                {loading ? (
-                  <div className="p-12 text-center text-gray-600">Loading campaigns...</div>
-                ) : currentCampaigns.length === 0 ? (
-                  <div className="p-12 text-center text-gray-600">No campaigns found</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 border-b border-gray-200">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-12">No</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-32">Cover</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Campaign</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Donatur</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Target</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Terkumpul</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">End Date</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Campaigner</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {loading ? (
+                        <TableSkeleton rows={entriesPerPage} columns={9} />
+                      ) : currentCampaigns.length === 0 ? (
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-12">No</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-32">Cover</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Campaign</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Donatur</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Target</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Terkumpul</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">End Date</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Campaigner</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
+                          <td colSpan={9} className="px-4 py-12 text-center text-gray-600">
+                            No campaigns found
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {currentCampaigns.map((campaign, index) => (
+                      ) : (
+                        currentCampaigns.map((campaign, index) => (
                           <tr key={campaign.id} className="hover:bg-gray-50 transition-colors">
                             <td className="px-4 py-4 text-sm text-gray-600">{startIndex + index + 1}</td>
                             <td className="px-4 py-4 valign-top">
@@ -376,11 +429,12 @@ export default function CampaignsPage() {
                               </div>
                             </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
 
                 {/* Pagination */}
                 {!loading && currentCampaigns.length > 0 && (

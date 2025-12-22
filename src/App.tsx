@@ -64,7 +64,12 @@ import CampaignPrayersPage from './pages/CampaignPrayersPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ThemeProvider from './components/ThemeProvider';
 
+import { usePageTitle } from './hooks/usePageTitle';
+import { useAppName } from './hooks/useAppName';
+
 function HomePage() {
+  const { appName, tagline } = useAppName();
+  usePageTitle(appName, tagline ? ` - ${tagline}` : '');
   return (
     <div className="flex flex-col h-full bg-gray-50">
       <Header />
@@ -153,6 +158,8 @@ function AppContent() {
       <Route path="/campaign/:slug/invoice/:invoiceCode" element={<InvoicePage />} />
       <Route path="/invoice/:invoiceCode" element={<InvoicePage />} />
       <Route path="/payment/status" element={<PaymentStatusPage />} />
+      <Route path="/payment/success" element={<PaymentStatusPage />} />
+      <Route path="/payment/failed" element={<PaymentStatusPage />} />
       <Route path="/zakat" element={<ZakatPage />} />
       <Route path="/infaq" element={<InfaqPage />} />
       <Route path="/fidyah" element={<FidyahPage />} />

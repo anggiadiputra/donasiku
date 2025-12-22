@@ -8,7 +8,17 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [loading, setLoading] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
+  // Optimistic check: assume authenticated if session token exists in localStorage
+  const [authenticated, setAuthenticated] = useState(() => {
+    try {
+      // Supabase stores session in localStorage with key pattern: sb-{project-ref}-auth-token
+      const keys = Object.keys(localStorage);
+      const hasAuthToken = keys.some(key => key.includes('sb-') && key.includes('-auth-token'));
+      return hasAuthToken;
+    } catch {
+      return false;
+    }
+  });
   const location = useLocation();
 
   useEffect(() => {
@@ -36,21 +46,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div
-            className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 mb-4"
-            style={{ borderColor: 'var(--primary-color, #f97316)' }}
-          ></div>
-          <p className="text-gray-600">Memuat...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!authenticated) {
+  if (!authenticated && !loading) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

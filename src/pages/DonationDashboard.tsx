@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Loader2, Search, Eye, Trash2, RefreshCw } from 'lucide-react';
+import { Search, Eye, Trash2, RefreshCw } from 'lucide-react';
+import { DashboardSkeleton } from '../components/SkeletonLoader';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface Transaction {
     id: string;
@@ -26,6 +28,7 @@ interface Campaign {
 }
 
 export default function DonationDashboard() {
+    usePageTitle('Dashboard Donasi');
     const navigate = useNavigate();
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [campaigns, setCampaigns] = useState<{ [key: string]: Campaign }>({});
@@ -143,14 +146,7 @@ export default function DonationDashboard() {
     const currentTransactions = transactions; // Data is already paginated form DB
 
     if (loading) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-                    <p className="text-gray-600">Memuat data donasi...</p>
-                </div>
-            </div>
-        );
+        return <DashboardSkeleton />;
     }
 
     return (

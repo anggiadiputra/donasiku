@@ -5,6 +5,7 @@ import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { darkenColor } from '../utils/colorUtils';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface Transaction {
     id: string;
@@ -26,6 +27,7 @@ interface Campaign {
 }
 
 export default function ZiswafPage() {
+    usePageTitle('Cek Riwayat Donasi');
     const primaryColor = usePrimaryColor();
     const hoverColor = darkenColor(primaryColor, 20);
 

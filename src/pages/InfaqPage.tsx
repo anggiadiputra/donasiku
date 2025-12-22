@@ -13,9 +13,11 @@ import { supabase, Donation, InfaqSettings } from '../lib/supabase';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { getHoverColor } from '../utils/colorUtils';
 
 export default function InfaqPage() {
+  usePageTitle('Bayar Infaq');
   const navigate = useNavigate();
   const primaryColor = usePrimaryColor();
   const hoverColor = getHoverColor(primaryColor);

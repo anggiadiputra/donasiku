@@ -9,6 +9,8 @@ import {
 import DashboardLayout from '../components/DashboardLayout';
 import ImageUpload from '../components/ImageUpload';
 import { supabase, InfaqSettings } from '../lib/supabase';
+import { usePageTitle } from '../hooks/usePageTitle';
+import { SettingsPageSkeleton } from '../components/SkeletonLoader';
 
 export default function InfaqSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,8 @@ export default function InfaqSettingsPage() {
   useEffect(() => {
     fetchSettings();
   }, []);
+
+  usePageTitle('Pengaturan Infaq');
 
   const fetchSettings = async () => {
     try {
@@ -143,9 +147,7 @@ export default function InfaqSettingsPage() {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-        </div>
+        <SettingsPageSkeleton />
       </DashboardLayout>
     );
   }

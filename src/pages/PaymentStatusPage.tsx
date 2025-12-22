@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { PaymentStatusSkeleton } from '../components/SkeletonLoader';
 import { CheckCircle2, XCircle, Loader2, Clock, Copy, ExternalLink, ArrowLeft } from 'lucide-react';
 
 interface Transaction {
@@ -35,7 +36,8 @@ export default function PaymentStatusPage() {
     const [transaction, setTransaction] = useState<Transaction | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [copied, setCopied] = useState(false);
+    const [copiedVA, setCopiedVA] = useState(false);
+    const [copiedInvoice, setCopiedInvoice] = useState(false);
     const [checking, setChecking] = useState(false);
 
     const merchantOrderId = searchParams.get('merchantOrderId') || searchParams.get('orderId');
@@ -117,27 +119,23 @@ export default function PaymentStatusPage() {
         }).format(new Date(dateString));
     }
 
-    async function copyToClipboard(text: string) {
+    async function copyToClipboard(text: string, type: 'invoice' | 'va') {
         try {
             await navigator.clipboard.writeText(text);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            if (type === 'invoice') {
+                setCopiedInvoice(true);
+                setTimeout(() => setCopiedInvoice(false), 2000);
+            } else {
+                setCopiedVA(true);
+                setTimeout(() => setCopiedVA(false), 2000);
+            }
         } catch (err) {
             console.error('Failed to copy:', err);
         }
     }
 
     if (loading) {
-        return (
-            <div className="fixed inset-0 bg-gray-100 flex justify-center">
-                <div className="w-full max-w-[480px] bg-gradient-to-br from-orange-50 to-white shadow-2xl flex flex-col h-full relative p-4">
-                    <div className="flex flex-col items-center justify-center h-full text-center">
-                        <Loader2 className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
-                        <p className="text-gray-600">Memuat data pembayaran...</p>
-                    </div>
-                </div>
-            </div>
-        );
+        return <PaymentStatusSkeleton />;
     }
 
     if (error || !transaction) {
@@ -222,10 +220,10 @@ export default function PaymentStatusPage() {
                                         <p className="font-bold text-gray-800 text-lg break-all">{transaction.invoice_code}</p>
                                     </div>
                                     <button
-                                        onClick={() => copyToClipboard(transaction.invoice_code)}
-                                        className="p-2 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0"
+                                        onClick={() => copyToClipboard(transaction.invoice_code, 'invoice')}
+                                        className={`p-2 rounded-lg transition-colors flex-shrink-0 ${copiedInvoice ? 'bg-green-100 text-green-600' : 'hover:bg-gray-200 text-gray-600'}`}
                                     >
-                                        <Copy className="w-5 h-5 text-gray-600" />
+                                        {copiedInvoice ? <CheckCircle2 className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                                     </button>
                                 </div>
 
@@ -277,11 +275,20 @@ export default function PaymentStatusPage() {
                                         <div className="flex items-center justify-between gap-2">
                                             <p className="font-mono font-bold text-blue-600 text-xl break-all">{transaction.va_number}</p>
                                             <button
-                                                onClick={() => copyToClipboard(transaction.va_number!)}
-                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 flex-shrink-0"
+                                                onClick={() => copyToClipboard(transaction.va_number!, 'va')}
+                                                className={`px-4 py-2 text-white rounded-lg transition-colors flex items-center gap-2 flex-shrink-0 ${copiedVA ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                                             >
-                                                <Copy className="w-4 h-4" />
-                                                {copied ? 'Tersalin!' : 'Salin'}
+                                                {copiedVA ? (
+                                                    <>
+                                                        <CheckCircle2 className="w-4 h-4" />
+                                                        Tersalin!
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy className="w-4 h-4" />
+                                                        Salin
+                                                    </>
+                                                )}
                                             </button>
                                         </div>
                                     </div>

@@ -5,10 +5,13 @@ import { supabase, Campaign, Category } from '../lib/supabase';
 import CampaignCard from '../components/CampaignCard';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { createSlug } from '../utils/slug';
+import { CampaignsListPageSkeleton } from '../components/SkeletonLoader';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const CAMPAIGNS_PER_PAGE = 10;
 
 export default function CampaignsListPage() {
+  usePageTitle('Daftar Campaign');
   const navigate = useNavigate();
   const primaryColor = usePrimaryColor();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -194,15 +197,7 @@ export default function CampaignsListPage() {
   };
 
   if (loading) {
-    return (
-      <div className="fixed inset-0 bg-gray-100 flex justify-center">
-        <div className="w-full max-w-[480px] bg-white shadow-2xl flex flex-col h-full relative">
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="w-8 h-8 animate-spin" style={{ color: primaryColor }} />
-          </div>
-        </div>
-      </div>
-    );
+    return <CampaignsListPageSkeleton />;
   }
 
   return (

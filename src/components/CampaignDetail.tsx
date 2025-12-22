@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Share2, MapPin, CheckCircle, MessageCircle, ArrowUp } from 'lucide-react';
 import { supabase, Campaign, Testimonial } from '../lib/supabase';
+import ShareModal from '../components/ShareModal';
 
 interface CampaignDetailProps {
   campaign: Campaign | null;
@@ -14,6 +15,7 @@ export default function CampaignDetail({ campaign, isOpen, onClose }: CampaignDe
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [showAllTestimonials, setShowAllTestimonials] = useState(false);
   const [scrollY, setScrollY] = useState(0);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const handleDonate = () => {
     navigate('/donasi', { state: { campaign } });
@@ -150,7 +152,10 @@ export default function CampaignDetail({ campaign, isOpen, onClose }: CampaignDe
               >
                 Donasi Sekarang
               </button>
-              <button className="w-12 h-12 flex items-center justify-center border-2 border-blue-700 text-blue-700 rounded-full hover:bg-blue-50 transition-colors">
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="w-12 h-12 flex items-center justify-center border-2 border-blue-700 text-blue-700 rounded-full hover:bg-blue-50 transition-colors"
+              >
                 <Share2 className="w-5 h-5" />
               </button>
             </div>
@@ -256,7 +261,10 @@ export default function CampaignDetail({ campaign, isOpen, onClose }: CampaignDe
             </div>
 
             <div className="flex gap-2">
-              <button className="flex-1 flex items-center justify-center gap-2 border-2 border-blue-700 text-blue-700 py-3 rounded-full font-semibold hover:bg-blue-50 transition-colors">
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="flex-1 flex items-center justify-center gap-2 border-2 border-blue-700 text-blue-700 py-3 rounded-full font-semibold hover:bg-blue-50 transition-colors"
+              >
                 <Share2 className="w-5 h-5" />
                 Bagikan
               </button>
@@ -281,7 +289,14 @@ export default function CampaignDetail({ campaign, isOpen, onClose }: CampaignDe
             <ArrowUp className="w-5 h-5" />
           </button>
         )}
+        <ShareModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          shareUrl={`${window.location.origin}/campaign/${campaign?.slug}?utm_source=socialsharing_donor_web_campaign_detail&utm_medium=share_campaign_copas&utm_campaign=share_detail_campaign`}
+          shareText={campaign ? `Bantu ${campaign.title} di Donasiku!` : 'Bantu campaign ini di Donasiku!'}
+        />
       </div>
     </div>
   );
 }
+```
