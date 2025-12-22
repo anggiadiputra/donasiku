@@ -1,7 +1,6 @@
-```javascript
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { Heart, User, Check, AlertCircle } from 'lucide-react';
+import { Check, ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase, Campaign } from '../lib/supabase';
 import { findCampaignBySlug } from '../utils/slug';
@@ -101,17 +100,17 @@ export default function DonationForm() {
             // Format in millions (juta)
             const millions = amount / 1000000;
             label = millions % 1 === 0
-              ? `Rp ${ millions } jt`
-              : `Rp ${ millions.toFixed(1) } jt`;
+              ? `Rp ${millions} jt`
+              : `Rp ${millions.toFixed(1)} jt`;
           } else if (amount >= 1000) {
             // Format in thousands (ribu)
             const thousands = amount / 1000;
             label = thousands % 1 === 0
-              ? `Rp ${ thousands } rb`
-              : `Rp ${ thousands.toFixed(0) } rb`;
+              ? `Rp ${thousands} rb`
+              : `Rp ${thousands.toFixed(0)} rb`;
           } else {
             // Less than 1000, show as is
-            label = `Rp ${ amount } `;
+            label = `Rp ${amount} `;
           }
 
           return {
@@ -267,7 +266,7 @@ export default function DonationForm() {
       // Custom product details for Fidyah
       const numberOfDays = (location.state as any)?.numberOfDays || 1;
       const productDetails = isFidyahPage
-        ? `Bayar Fidyah atas nama ${ hideName ? anonymousName : fullName } untuk ${ numberOfDays } hari`
+        ? `Bayar Fidyah atas nama ${hideName ? anonymousName : fullName} untuk ${numberOfDays} hari`
         : undefined;
 
       // Call Edge Function to create transaction
@@ -277,10 +276,10 @@ export default function DonationForm() {
           amount: amount, // Assuming 'amount' is the correct variable from the context
           paymentMethod: paymentMethod, // Assuming 'paymentMethod' is the correct variable from the context
           customerName: hideName ? anonymousName : fullName,
-          customerEmail: email || `${ phone } @donasiku.com`, // Keeping original logic for email
+          customerEmail: email || `${phone} @donasiku.com`, // Keeping original logic for email
           customerPhone: phone,
           customerMessage: message || '', // Keeping original logic for message
-          returnUrl: `${ window.location.origin } /payment/success`, // Keeping original logic for returnUrl
+          returnUrl: `${window.location.origin} /payment/success`, // Keeping original logic for returnUrl
           productDetails: productDetails, // Pass the custom details
         },
       });
@@ -296,7 +295,7 @@ export default function DonationForm() {
 
 
         // Navigate to invoice page with transaction data
-        navigate(`/ invoice / ${ transaction.transaction.invoiceCode } `, {
+        navigate(`/ invoice / ${transaction.transaction.invoiceCode} `, {
           state: {
             transaction: transaction.transaction,
             campaign: displayCampaign,
@@ -389,14 +388,13 @@ export default function DonationForm() {
                       type="button"
                       onClick={() => handleAmountSelect(item.value)}
                       disabled={isProcessing}
-                      className={`relative p - 4 rounded - lg border - 2 transition - all ${
-  selectedAmount === item.value
-  ? 'border-transparent'
-  : 'bg-white border-gray-200 hover:border-gray-300'
-} ${ isProcessing ? 'opacity-50 cursor-not-allowed' : '' } `}
+                      className={`relative p - 4 rounded - lg border - 2 transition - all ${selectedAmount === item.value
+                        ? 'border-transparent'
+                        : 'bg-white border-gray-200 hover:border-gray-300'
+                        } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''} `}
                       style={selectedAmount === item.value ? {
                         borderColor: primaryColor,
-                        backgroundColor: `${ primaryColor } 10`
+                        backgroundColor: `${primaryColor} 10`
                       } : {}}
                       onMouseEnter={(e) => {
                         if (selectedAmount !== item.value && !isProcessing) {
@@ -428,14 +426,13 @@ export default function DonationForm() {
                     type="button"
                     onClick={() => handleAmountSelect(null)}
                     disabled={isProcessing}
-                    className={`relative p - 4 rounded - lg border - 2 transition - all ${
-  selectedAmount === null
-  ? 'border-transparent'
-  : 'bg-white border-gray-200 hover:border-gray-300'
-} ${ isProcessing ? 'opacity-50 cursor-not-allowed' : '' } `}
+                    className={`relative p - 4 rounded - lg border - 2 transition - all ${selectedAmount === null
+                      ? 'border-transparent'
+                      : 'bg-white border-gray-200 hover:border-gray-300'
+                      } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''} `}
                     style={selectedAmount === null ? {
                       borderColor: primaryColor,
-                      backgroundColor: `${ primaryColor } 10`
+                      backgroundColor: `${primaryColor} 10`
                     } : {}}
                     onMouseEnter={(e) => {
                       if (selectedAmount !== null && !isProcessing) {
@@ -518,13 +515,12 @@ export default function DonationForm() {
                   type="button"
                   onClick={() => setHideName(!hideName)}
                   disabled={isProcessing}
-                  className={`relative w - 12 h - 6 rounded - full transition - colors ${ isProcessing ? 'opacity-50 cursor-not-allowed' : '' } `}
+                  className={`relative w - 12 h - 6 rounded - full transition - colors ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''} `}
                   style={{ backgroundColor: hideName ? primaryColor : '#d1d5db' }}
                 >
                   <span
-                    className={`absolute top - 1 left - 1 w - 4 h - 4 bg - white rounded - full transition - transform ${
-  hideName ? 'translate-x-6' : 'translate-x-0'
-} `}
+                    className={`absolute top - 1 left - 1 w - 4 h - 4 bg - white rounded - full transition - transform ${hideName ? 'translate-x-6' : 'translate-x-0'
+                      } `}
                   />
                 </button>
               </div>
@@ -584,7 +580,7 @@ export default function DonationForm() {
                 Memproses Pembayaran...
               </>
             ) : (
-              `${ isFidyahPage ? 'Tunaikan' : 'Donasi' } - ${ formatCurrency(getDisplayAmount()) } `
+              `${isFidyahPage ? 'Tunaikan' : 'Donasi'} - ${formatCurrency(getDisplayAmount())} `
             )}
           </button>
         </div>

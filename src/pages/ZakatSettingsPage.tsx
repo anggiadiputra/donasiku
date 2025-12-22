@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, Save, Loader2, Info } from 'lucide-react';
+import { Save, Loader2, Info, Coins } from 'lucide-react';
 import { toast } from 'sonner';
 import DashboardLayout from '../components/DashboardLayout';
 import { supabase, ZakatSettings } from '../lib/supabase';
@@ -300,7 +300,7 @@ export default function ZakatSettingsPage() {
         </div>
       </div>
 
-    </DashboardLayout >
+    </DashboardLayout>
   );
 }
 

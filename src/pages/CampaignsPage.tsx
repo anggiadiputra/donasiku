@@ -52,7 +52,7 @@ export default function CampaignsPage() {
         .select('*', { count: 'exact' });
 
       if (searchQuery) {
-        query = query.or(`title.ilike.% ${searchQuery}%, description.ilike.% ${searchQuery}% `);
+        query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
       }
 
       const from = (currentPage - 1) * entriesPerPage;
@@ -135,7 +135,7 @@ export default function CampaignsPage() {
     };
 
     return (
-      <span className={`px - 2 py - 1 text - xs font - semibold rounded ${statusStyles[currentStatus] || statusStyles.draft} `}>
+      <span className={`px-2 py-1 text-xs font-semibold rounded ${statusStyles[currentStatus] || statusStyles.draft}`}>
         {statusLabels[currentStatus] || currentStatus.toUpperCase()}
       </span>
     );
@@ -148,7 +148,7 @@ export default function CampaignsPage() {
 
 
   const handleDelete = async (id: string, title: string) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus campaign "${title}" ? `)) {
+    if (confirm(`Apakah Anda yakin ingin menghapus campaign "${title}"?`)) {
       try {
         setLoading(true);
 
@@ -227,7 +227,7 @@ export default function CampaignsPage() {
 
       {/* Sidebar */}
       <div className={`
-        fixed md:static inset - y - 0 left - 0 z - 50 w - 64 bg - white transform transition - transform duration - 200 ease -in -out md: transform - none
+        fixed md:static inset-y-0 left-0 z-50 w-64 bg-white transform transition-transform duration-200 ease-in-out md:transform-none
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
 `}>
         <Sidebar onClose={() => setSidebarOpen(false)} />
@@ -417,7 +417,7 @@ export default function CampaignsPage() {
                             <td className="px-4 py-4">
                               <div className="flex items-center gap-2">
                                 <button
-                                  onClick={() => navigate(`/ donasi / campaigns / edit / ${campaign.id} `)}
+                                  onClick={() => navigate(`/donasi/campaigns/edit/${campaign.id}`)}
                                   className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                                 >
                                   <Pencil className="w-4 h-4" />

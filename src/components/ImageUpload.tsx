@@ -1,4 +1,4 @@
-```javascript
+
 import { useState, useRef } from 'react';
 import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -74,7 +74,7 @@ export default function ImageUpload({
                         <img
                             src={value}
                             alt="Uploaded"
-                            className={`w - full ${ height } object - cover bg - gray - 50`}
+                            className={`w-full ${height} object-cover bg-gray-50`}
                         />
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                             <button
@@ -106,12 +106,12 @@ export default function ImageUpload({
                     <div
                         onClick={() => !uploading && fileInputRef.current?.click()}
                         className={`
-border - 2 border - dashed border - gray - 300 rounded - lg p - 6
-              flex flex - col items - center justify - center gap - 3
-cursor - pointer hover: bg - gray - 50 transition - colors
-              ${ height }
-              ${ uploading ? 'opacity-50 pointer-events-none' : '' }
-`}
+              border-2 border-dashed border-gray-300 rounded-lg p-6
+              flex flex-col items-center justify-center gap-3
+              cursor-pointer hover:bg-gray-50 transition-colors
+              ${height}
+              ${uploading ? 'opacity-50 pointer-events-none' : ''}
+              `}
                     >
                         <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
                             {uploading ? (

@@ -393,7 +393,60 @@ export const CampaignsListPageSkeleton = () => (
     </div>
 );
 
-// Dashboard Skeleton (New Design: Cards + Charts + Table)
+// Dashboard Content Skeleton (for use inside DashboardLayout)
+export const DashboardContentSkeleton = () => (
+    <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 overflow-y-auto w-full">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map(i => (
+                <div key={i} className="bg-white rounded-xl p-6 border border-gray-200 h-[150px] flex flex-col justify-between">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <SkeletonBox className="h-3 w-20 mb-2" />
+                            <SkeletonBox className="h-8 w-32" />
+                        </div>
+                        <SkeletonBox className="h-10 w-20" />
+                    </div>
+                    <SkeletonBox className="h-6 w-24 rounded-full self-start" />
+                </div>
+            ))}
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Chart */}
+            <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6 h-[400px]">
+                <div className="flex justify-between mb-6">
+                    <SkeletonBox className="h-6 w-32" />
+                    <SkeletonBox className="h-8 w-48 rounded-lg" />
+                </div>
+                <SkeletonBox className="h-full w-full rounded-lg" />
+            </div>
+            {/* Side Chart */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6 h-[400px]">
+                <SkeletonBox className="h-6 w-32 mb-6" />
+                <SkeletonBox className="h-full w-full rounded-lg" />
+            </div>
+        </div>
+
+        {/* Table Skeleton */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex justify-between mb-6">
+                <SkeletonBox className="h-5 w-48" />
+                <SkeletonBox className="h-5 w-24" />
+            </div>
+            <div className="space-y-4">
+                {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className="flex justify-between gap-4">
+                        <SkeletonBox className="h-12 flex-1" />
+                    </div>
+                ))}
+            </div>
+        </div>
+    </div>
+);
+
+// Dashboard Skeleton (New Design: Cards + Charts + Table) - Wraps content with Mock Sidebar for full page loading (legacy/fallback)
 export const DashboardSkeleton = () => (
     <div className="min-h-screen bg-[#F8F9FA] flex font-sans">
         {/* Sidebar Skeleton */}
@@ -418,55 +471,7 @@ export const DashboardSkeleton = () => (
             </div>
 
             {/* Content Skeleton */}
-            <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 overflow-y-auto">
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {[1, 2, 3, 4].map(i => (
-                        <div key={i} className="bg-white rounded-xl p-6 border border-gray-200 h-[150px] flex flex-col justify-between">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <SkeletonBox className="h-3 w-20 mb-2" />
-                                    <SkeletonBox className="h-8 w-32" />
-                                </div>
-                                <SkeletonBox className="h-10 w-20" />
-                            </div>
-                            <SkeletonBox className="h-6 w-24 rounded-full self-start" />
-                        </div>
-                    ))}
-                </div>
-
-                {/* Charts Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Main Chart */}
-                    <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6 h-[400px]">
-                        <div className="flex justify-between mb-6">
-                            <SkeletonBox className="h-6 w-32" />
-                            <SkeletonBox className="h-8 w-48 rounded-lg" />
-                        </div>
-                        <SkeletonBox className="h-full w-full rounded-lg" />
-                    </div>
-                    {/* Side Chart */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-6 h-[400px]">
-                        <SkeletonBox className="h-6 w-32 mb-6" />
-                        <SkeletonBox className="h-full w-full rounded-lg" />
-                    </div>
-                </div>
-
-                {/* Table Skeleton */}
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                    <div className="flex justify-between mb-6">
-                        <SkeletonBox className="h-5 w-48" />
-                        <SkeletonBox className="h-5 w-24" />
-                    </div>
-                    <div className="space-y-4">
-                        {[1, 2, 3, 4, 5].map(i => (
-                            <div key={i} className="flex justify-between gap-4">
-                                <SkeletonBox className="h-12 flex-1" />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
+            <DashboardContentSkeleton />
         </div>
     </div>
 );
