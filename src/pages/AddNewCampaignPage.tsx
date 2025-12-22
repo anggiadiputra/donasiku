@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   Upload,
@@ -35,6 +36,9 @@ export default function AddNewCampaignPage() {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [categoryId, setCategoryId] = useState<string>('');
   const [status, setStatus] = useState<'draft' | 'published'>('draft');
+  const [isUrgent, setIsUrgent] = useState(false);
+  const [organizationName, setOrganizationName] = useState('');
+  const [organizationLogo, setOrganizationLogo] = useState('');
 
   useEffect(() => {
     fetchCategories();
@@ -59,6 +63,11 @@ export default function AddNewCampaignPage() {
         setCategoryId(data[0].id);
       }
     }
+  };
+
+  const getCategoryName = (id: string) => {
+    const category = categories.find(c => c.id === id);
+    return category ? category.name : '';
   };
 
   const handleAddCategory = async () => {
@@ -178,16 +187,13 @@ export default function AddNewCampaignPage() {
     }
   };
 
-  const handleSave = async (publish: boolean = false) => {
-    // Strip HTML tags for validation
-    const textContent = description.replace(/<[^>]*>/g, '').trim();
-    if (!title.trim() || !textContent) {
-      alert('Judul dan Keterangan wajib diisi');
+  const handleSave = async (publish: boolean) => {
+    if (!title || !description) { // Changed description to content for validation
+      toast.error('Judul dan Keterangan wajib diisi');
       return;
     }
 
     setLoading(true);
-
     try {
       let imageUrl = imagePreview;
 
@@ -202,53 +208,63 @@ export default function AddNewCampaignPage() {
         .filter(amt => amt.trim() !== '')
         .map(amt => parseFloat(amt.replace(/\./g, '')) || 0);
 
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        alert('Anda harus login untuk membuat campaign');
-        navigate('/login');
+        toast.error('Anda harus login untuk membuat campaign');
         return;
       }
 
-      // Generate slug if not provided
+      // Generate slug from title if not manually edited
       const finalSlug = slug.trim() || createSlug(title);
+
+      // Fetch app settings (assuming there's a way to get the current app_settings_id)
+      // For now, we'll use a placeholder or assume it's not strictly required for initial insert
+      const { data: appSettingsData } = await supabase
+        .from('app_settings')
+        .select('id')
+        .single();
+      const appSettingsId = appSettingsData?.id || null;
+
+
+      const campaignData = {
+        title,
+        slug: finalSlug,
+        description: description.replace(/<[^>]*>/g, '').substring(0, 150), // Short description (stripped HTML)
+        full_description: description, // Rich text content (HTML)
+        image_url: imageUrl, // Main image
+        target_amount: parseFloat(targetAmount.replace(/\./g, '')) || 0,
+        current_amount: 0,
+        category: getCategoryName(categoryId), // Store Name (Legacy)
+        category_id: categoryId, // Store ID (Relation)
+        is_urgent: isUrgent,
+        is_verified: false, // Default to false
+        status: publish ? 'published' : 'draft',
+        user_id: user.id,
+        app_settings_id: appSettingsId, // Link to app settings
+        target_location: location,
+        gmaps_link: gmapsLink,
+        form_type: formType,
+        display_format: 'card',
+        preset_amounts: presetAmountsNumeric,
+        organization_name: organizationName,
+        organization_logo: organizationLogo,
+        end_date: endDate ? new Date(endDate).toISOString() : null
+      };
 
       const { error } = await supabase
         .from('campaigns')
-        .insert({
-          title,
-          slug: finalSlug,
-          description,
-          full_description: description,
-          image_url: imageUrl || '',
-          target_amount: parseFloat(targetAmount.replace(/\./g, '')) || 0,
-          current_amount: 0,
-          category: categories.find(c => c.id === categoryId)?.slug || 'infaq',
-          category_id: categoryId || null,
-          user_id: user.id,
-          target_location: location,
-          gmaps_link: gmapsLink,
-          form_type: formType,
-          display_format: 'card',
-          preset_amounts: presetAmountsNumeric,
-          status: publish ? 'published' : status,
-          is_urgent: false,
-          is_verified: false,
-        })
-        .select()
-        .single();
+        .insert([campaignData]);
 
       if (error) {
-        console.error('Error creating campaign:', error);
-        alert('Gagal menyimpan campaign: ' + error.message);
+        toast.error('Gagal menyimpan campaign: ' + error.message);
       } else {
-        alert(publish ? 'Campaign berhasil dipublish!' : 'Campaign berhasil disimpan sebagai draft!');
-        navigate('/donasi/campaigns');
+        toast.success(publish ? 'Campaign berhasil dipublish!' : 'Campaign berhasil disimpan sebagai draft!');
+        navigate('/donasi/campaigns'); // Create separate page for list management later
       }
     } catch (error) {
-      console.error('Error:', error);
-      alert('Terjadi kesalahan saat menyimpan campaign');
+      console.error('Error saving campaign:', error);
+      toast.error('Terjadi kesalahan saat menyimpan campaign');
     } finally {
       setLoading(false);
     }

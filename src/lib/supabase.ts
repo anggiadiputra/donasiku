@@ -147,6 +147,10 @@ export interface LayoutSettings {
   campaign_slider_2_ids?: string[]; // Array of campaign IDs for second slider
   cta_slider_enabled?: boolean;
   cta_slider_items?: any[];
+  cta_primary_label?: string;
+  cta_primary_link?: string;
+  cta_secondary_label?: string;
+  cta_secondary_link?: string;
   footer_enabled: boolean;
   footer_content?: any;
   created_at: string;

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 import { supabase } from '../lib/supabase';
@@ -141,7 +142,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Masukka
           // Remove placeholder and show error
           quill.deleteText(index, 20);
           quill.insertText(index, 'Failed to upload image', 'user');
-          alert('Gagal mengupload gambar. Silakan coba lagi.');
+          toast.error('Gagal mengupload gambar. Silakan coba lagi.');
         }
       } catch (error) {
         console.error('Error uploading image:', error);
@@ -149,7 +150,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Masukka
           quill.deleteText(index, 20);
           quill.insertText(index, 'Failed to upload image', 'user');
         }
-        alert('Gagal mengupload gambar. Silakan coba lagi.');
+        toast.error('Gagal mengupload gambar. Silakan coba lagi.');
       }
     };
   };

@@ -20,8 +20,12 @@ import {
   Clock,
   Globe,
   Smartphone,
-  Type
+  Type,
+  RefreshCw,
+  MessageCircle,
+  Copy
 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   DndContext,
   closestCenter,
@@ -289,8 +293,8 @@ export default function SettingsPage() {
     applyFontSettings(fontSettings);
     // alert('Pengaturan font disimpan!'); // Removed alert for cleaner UX, or keep it? LayoutSettings uses alert.
     // LayoutSettings used proper saving. I'll keep alert but after loading.
+    toast.success('Pengaturan font berhasil disimpan!');
     setSavingSection(null);
-    alert('Pengaturan font berhasil disimpan!');
   };
 
   // Apply primary color globally
@@ -373,19 +377,19 @@ export default function SettingsPage() {
 
       if (error) {
         console.error('Error syncing payment methods:', error);
-        alert('Gagal sync payment methods: ' + error.message);
+        toast.error('Gagal sync payment methods: ' + error.message);
         return;
       }
 
       if (data.success) {
-        alert(`Berhasil sync ${data.synced.length} payment methods!`);
+        toast.success(`Berhasil sync ${data.synced.length} payment methods!`);
         await fetchPaymentMethods(); // Refresh list
       } else {
-        alert('Gagal sync payment methods');
+        toast.error('Gagal sync payment methods');
       }
     } catch (error: any) {
       console.error('Error:', error);
-      alert('Error: ' + error.message);
+      toast.error('Error: ' + error.message);
     } finally {
       setSyncingPaymentMethods(false);
     }
@@ -431,13 +435,13 @@ export default function SettingsPage() {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('File harus berupa gambar');
+      toast.error('File harus berupa gambar');
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Ukuran file maksimal 5MB');
+      toast.error('Ukuran file maksimal 5MB');
       return;
     }
 
@@ -449,7 +453,7 @@ export default function SettingsPage() {
 
       if (!s3Endpoint) {
         console.error('❌ Missing VITE_S3_API_ENDPOINT');
-        alert('❌ VITE_S3_API_ENDPOINT belum diset! Silakan refresh halaman atau cek .env');
+        toast.error('❌ VITE_S3_API_ENDPOINT belum diset! Silakan refresh halaman atau cek .env');
         setUploadingLogo(false);
         return; // Stop here, do not fallback
       }
@@ -461,14 +465,14 @@ export default function SettingsPage() {
 
       if (logoUrl) {
         setSettings(prev => ({ ...prev, logo_url: logoUrl }));
-        alert('Logo berhasil diupload ke S3!');
+        toast.success('Logo berhasil diupload ke S3!');
       } else {
         console.error('❌ S3 Upload returned null/empty URL');
         throw new Error('Upload S3 gagal (URL kosong). Cek console browser untuk detail.');
       }
     } catch (error: any) {
       console.error('❌ Error handling logo upload:', error);
-      alert('Upload Gagal: ' + (error.message || 'Unknown error'));
+      toast.error('Upload Gagal: ' + (error.message || 'Unknown error'));
     } finally {
       setUploadingLogo(false);
     }
@@ -482,12 +486,12 @@ export default function SettingsPage() {
     const FONNTE_TOKEN = import.meta.env.VITE_FONNTE_TOKEN;
 
     if (!FONNTE_TOKEN) {
-      alert('FONNTE_TOKEN tidak ditemukan di environment variables. Pastikan sudah dikonfigurasi di .env');
+      toast.error('FONNTE_TOKEN tidak ditemukan di environment variables. Pastikan sudah dikonfigurasi di .env');
       return;
     }
 
     if (!testPhoneNumber) {
-      alert('Masukkan nomor HP untuk test terlebih dahulu');
+      toast.error('Masukkan nomor HP untuk test terlebih dahulu');
       return;
     }
 
@@ -507,13 +511,13 @@ export default function SettingsPage() {
 
       const res = await response.json();
       if (res.status) {
-        alert('✅ Test Berhasil! Pesan WhatsApp terkirim ke ' + testPhoneNumber);
+        toast.success('✅ Test Berhasil! Pesan WhatsApp terkirim ke ' + testPhoneNumber);
       } else {
-        alert('❌ Test Gagal: ' + (res.reason || JSON.stringify(res)));
+        toast.error('❌ Test Gagal: ' + (res.reason || JSON.stringify(res)));
       }
     } catch (error: any) {
       console.error('Fonnte Test Error:', error);
-      alert('❌ Error: ' + error.message);
+      toast.error('❌ Error: ' + error.message);
     } finally {
       setTestingFonnte(false);
     }
@@ -545,7 +549,7 @@ export default function SettingsPage() {
         }
         await fetchPaymentMethods();
         setSavingSection(null);
-        alert('Metode pembayaran berhasil disimpan!');
+        toast.success('Metode pembayaran berhasil disimpan!');
         return;
       }
 
@@ -591,10 +595,10 @@ export default function SettingsPage() {
         localStorage.setItem('primaryColor', settings.primary_color);
       }
 
-      alert('Pengaturan berhasil disimpan!');
+      toast.success('Pengaturan berhasil disimpan!');
     } catch (error: any) {
       console.error('Error saving settings:', error);
-      alert('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));
+      toast.error('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));
     } finally {
       setSavingSection(null);
     }

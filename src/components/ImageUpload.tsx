@@ -1,5 +1,7 @@
+```javascript
 import { useState, useRef } from 'react';
 import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
+import { toast } from 'sonner';
 import { uploadToS3ViaAPI } from '../utils/s3Storage';
 
 interface ImageUploadProps {
@@ -30,7 +32,7 @@ export default function ImageUpload({
 
         // Validate size (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
-            alert('Ukuran file maksimal 5MB');
+            toast.error('Ukuran file maksimal 5MB');
             return;
         }
 
@@ -44,7 +46,7 @@ export default function ImageUpload({
             }
         } catch (error: any) {
             console.error('Upload error:', error);
-            alert('Gagal mengupload gambar: ' + (error.message || 'Unknown error'));
+            toast.error('Gagal mengupload gambar: ' + (error.message || 'Unknown error'));
         } finally {
             setUploading(false);
             // Reset input
@@ -72,7 +74,7 @@ export default function ImageUpload({
                         <img
                             src={value}
                             alt="Uploaded"
-                            className={`w-full ${height} object-cover bg-gray-50`}
+                            className={`w - full ${ height } object - cover bg - gray - 50`}
                         />
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                             <button
@@ -104,12 +106,12 @@ export default function ImageUpload({
                     <div
                         onClick={() => !uploading && fileInputRef.current?.click()}
                         className={`
-              border-2 border-dashed border-gray-300 rounded-lg p-6
-              flex flex-col items-center justify-center gap-3
-              cursor-pointer hover:bg-gray-50 transition-colors
-              ${height}
-              ${uploading ? 'opacity-50 pointer-events-none' : ''}
-            `}
+border - 2 border - dashed border - gray - 300 rounded - lg p - 6
+              flex flex - col items - center justify - center gap - 3
+cursor - pointer hover: bg - gray - 50 transition - colors
+              ${ height }
+              ${ uploading ? 'opacity-50 pointer-events-none' : '' }
+`}
                     >
                         <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
                             {uploading ? (

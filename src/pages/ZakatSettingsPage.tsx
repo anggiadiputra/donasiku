@@ -1,10 +1,6 @@
 import { useState, useEffect } from 'react';
-import {
-  Coins,
-  Loader2,
-  Save,
-  Info
-} from 'lucide-react';
+import { ChevronLeft, Save, Loader2, Info } from 'lucide-react';
+import { toast } from 'sonner';
 import DashboardLayout from '../components/DashboardLayout';
 import { supabase, ZakatSettings } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -100,11 +96,11 @@ export default function ZakatSettingsPage() {
       }
 
       // Refresh settings after save
-      await fetchSettings();
-      alert('Pengaturan zakat berhasil disimpan!');
+      setSettings(settingsToSave);
+      toast.success('Pengaturan zakat berhasil disimpan!');
     } catch (error: any) {
       console.error('Error saving zakat settings:', error);
-      alert('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));
+      toast.error('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }

@@ -98,9 +98,9 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-// Note: FileText imported as FileTextIcon was used in original, fixing import conflict
 import { FileText as FileTextIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Toaster, toast } from 'sonner';
 import Sidebar from '../components/Sidebar';
 import ImageUpload from '../components/ImageUpload';
 
@@ -371,6 +371,10 @@ export default function LayoutSettingsPage() {
           // Defaults for new columns if null
           promo_slider_enabled: data.promo_slider_enabled ?? true,
           cta_slider_enabled: data.cta_slider_enabled ?? true,
+          cta_primary_label: data.cta_primary_label || 'Donasi Sekarang',
+          cta_primary_link: data.cta_primary_link || '/donasi',
+          cta_secondary_label: data.cta_secondary_label || 'Hubungi Admin',
+          cta_secondary_link: data.cta_secondary_link || 'https://wa.me/',
 
           // Campaign Slider Defaults
           campaign_slider_enabled: data.campaign_slider_enabled ?? true,
@@ -436,6 +440,10 @@ export default function LayoutSettingsPage() {
         // Explicitly set enabled flags
         promo_slider_enabled: settings.promo_slider_enabled,
         cta_slider_enabled: settings.cta_slider_enabled,
+        cta_primary_label: settings.cta_primary_label,
+        cta_primary_link: settings.cta_primary_link,
+        cta_secondary_label: settings.cta_secondary_label,
+        cta_secondary_link: settings.cta_secondary_link,
         campaign_slider_enabled: settings.campaign_slider_enabled,
         campaign_slider_title: settings.campaign_slider_title,
         campaign_slider_ids: settings.campaign_slider_ids || [],
@@ -476,10 +484,10 @@ export default function LayoutSettingsPage() {
 
       // Refresh settings after save
       await fetchSettings();
-      alert('Pengaturan layout berhasil disimpan!');
+      toast.success('Pengaturan layout berhasil disimpan!');
     } catch (error: any) {
       console.error('Error saving layout settings:', error);
-      alert('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));
+      toast.error('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));
     } finally {
       setSavingSection(null);
     }
@@ -1310,6 +1318,70 @@ export default function LayoutSettingsPage() {
                     </div>
                   )}
                   <CardSaveButton section="cta_slider" />
+                </div>
+
+                {/* Donation Stats / Bottom CTA Settings (NEW) */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      <Heart className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-gray-800">Section "Sudah Berbagi?"</h3>
+                      <p className="text-xs text-gray-500">Atur tombol pemicu donasi (Paling Bawah)</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Primary Button */}
+                      <div className="space-y-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
+                        <label className="text-sm font-semibold text-gray-700 block">Tombol Utama (Warna)</label>
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Label</label>
+                          <input
+                            value={settings.cta_primary_label || ''}
+                            onChange={(e) => setSettings(prev => ({ ...prev, cta_primary_label: e.target.value }))}
+                            placeholder="Donasi Sekarang"
+                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Link</label>
+                          <input
+                            value={settings.cta_primary_link || ''}
+                            onChange={(e) => setSettings(prev => ({ ...prev, cta_primary_link: e.target.value }))}
+                            placeholder="/donasi"
+                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Secondary Button */}
+                      <div className="space-y-3 p-3 border border-gray-200 rounded-lg bg-white">
+                        <label className="text-sm font-semibold text-gray-700 block">Tombol Kedua (Outline)</label>
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Label</label>
+                          <input
+                            value={settings.cta_secondary_label || ''}
+                            onChange={(e) => setSettings(prev => ({ ...prev, cta_secondary_label: e.target.value }))}
+                            placeholder="Hubungi Admin"
+                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Link</label>
+                          <input
+                            value={settings.cta_secondary_link || ''}
+                            onChange={(e) => setSettings(prev => ({ ...prev, cta_secondary_link: e.target.value }))}
+                            placeholder="https://wa.me/..."
+                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <CardSaveButton section="donation_stats" />
                 </div>
 
               </div>

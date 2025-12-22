@@ -38,11 +38,80 @@ export default function InvoicePage() {
   const [modalType, setModalType] = useState<'success' | 'pending' | 'failed'>('pending');
   const [modalMessage, setModalMessage] = useState('');
 
+  const fetchTransaction = async () => {
+    setLoading(true);
+
+    // 1. Try to get data from navigation state (only if we haven't fetched yet/first load optimization)
+    // Note: If we are refreshing (calling this manually), we probably want to skip state and go to DB?
+    // Actually, for consistency let's prefer DB if we are "refreshing", but for initial load state is fine.
+    // However, the original code used state if available.
+    // To support "refreshing" to see new status, we MUST fetch from DB.
+    // So let's modify logic: check DB first if we are checking, or just always check DB if invoiceCode exists?
+    // To behave like "initData", we can keep the logic but maybe for refresh we force DB?
+    // Simpler: Just allow the function to check DB. The navigation state is only useful for immediate display.
+    // Let's rely on invoiceCode data for "cleanest" accumulation.
+
+    // Actually, to preserve the exact behavior but allow refresh:
+    // "Refresh" implies we want the latest status. Navigation state is static from the previous page.
+    // So if we call fetchTransaction manually, we likely want to bypass the navigation state check if possible?
+    // Or maybe we just define this function to be the "DB Fetcher" and let the useEffect handle the "State vs DB" logic?
+
+    // Better approach:
+    // Define `fetchFromDb` and call that.
+
+    if (invoiceCode) {
+      try {
+        const { data: tx, error: txError } = await supabase
+          .from('transactions')
+          .select('*')
+          .or(`invoice_code.eq.${invoiceCode},merchant_order_id.eq.${invoiceCode}`)
+          .single();
+
+        if (txError) throw txError;
+
+        if (tx) {
+          // Fetch campaign
+          const { data: camp, error: campError } = await supabase
+            .from('campaigns')
+            .select('*')
+            .eq('id', tx.campaign_id)
+            .single();
+
+          if (campError) throw campError;
+
+          // Map DB snake_case to component camelCase expectations
+          const mappedTransaction = {
+            ...tx,
+            merchantOrderId: tx.merchant_order_id,
+            paymentMethod: tx.payment_method,
+            createdAt: tx.created_at,
+            expiryTime: tx.expiry_time,
+            duitkuReference: tx.duitku_reference,
+            vaNumber: tx.va_number,
+            qrString: tx.qr_string,
+            invoiceCode: tx.invoice_code
+          };
+
+          setData({
+            transaction: mappedTransaction,
+            campaign: camp,
+            customerName: tx.customer_name || 'Orang Baik',
+            customerPhone: tx.customer_phone || '',
+            customerEmail: tx.customer_email || '',
+            customerMessage: tx.customer_message || '',
+            paymentMethodName: undefined // Will be derived or fetched if needed
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching invoice data:', error);
+      }
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
     const initData = async () => {
-      setLoading(true);
-
-      // 1. Try to get data from navigation state
+      // 1. Try to get data from navigation state first for immediate render
       if (location.state?.transaction) {
         setData({
           transaction: location.state.transaction,
@@ -57,55 +126,8 @@ export default function InvoicePage() {
         return;
       }
 
-      // 2. If no state, fetch from database using invoiceCode
-      if (invoiceCode) {
-        try {
-          const { data: tx, error: txError } = await supabase
-            .from('transactions')
-            .select('*')
-            .or(`invoice_code.eq.${invoiceCode},merchant_order_id.eq.${invoiceCode}`)
-            .single();
-
-          if (txError) throw txError;
-
-          if (tx) {
-            // Fetch campaign
-            const { data: camp, error: campError } = await supabase
-              .from('campaigns')
-              .select('*')
-              .eq('id', tx.campaign_id)
-              .single();
-
-            if (campError) throw campError;
-
-            // Map DB snake_case to component camelCase expectations
-            const mappedTransaction = {
-              ...tx,
-              merchantOrderId: tx.merchant_order_id,
-              paymentMethod: tx.payment_method,
-              createdAt: tx.created_at,
-              expiryTime: tx.expiry_time,
-              duitkuReference: tx.duitku_reference,
-              vaNumber: tx.va_number,
-              qrString: tx.qr_string,
-              invoiceCode: tx.invoice_code
-            };
-
-            setData({
-              transaction: mappedTransaction,
-              campaign: camp,
-              customerName: tx.customer_name || 'Orang Baik',
-              customerPhone: tx.customer_phone || '',
-              customerEmail: tx.customer_email || '',
-              customerMessage: tx.customer_message || '',
-            });
-          }
-        } catch (error) {
-          console.error('Error fetching invoice data:', error);
-        }
-      }
-
-      setLoading(false);
+      // 2. Fallback to DB fetch
+      await fetchTransaction();
     };
 
     initData();
@@ -287,10 +309,10 @@ export default function InvoicePage() {
           setModalMessage('Terima kasih atas donasi Anda! 🙏');
           setShowModal(true);
 
-          // Reload current page to show paid status
-          setTimeout(() => {
-            window.location.reload();
-          }, 2000);
+          // Refresh data to show paid status
+          await fetchTransaction();
+          // Optional: You might want to close the modal after a delay or let user close it
+          // setShowModal(false); // If we want to auto clear, but success modal is usually good to keep.
         } else if (data.status === 'pending') {
           setModalType('pending');
           setModalMessage('Pembayaran Anda belum kami terima. Silakan lakukan pembayaran terlebih dahulu.');

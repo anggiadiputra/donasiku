@@ -4,8 +4,11 @@ import {
   Loader2,
   Save,
   Plus,
-  Trash2
+  Trash2,
+  ChevronLeft,
+  Info
 } from 'lucide-react';
+import { toast } from 'sonner';
 import DashboardLayout from '../components/DashboardLayout';
 import ImageUpload from '../components/ImageUpload';
 import { supabase, InfaqSettings } from '../lib/supabase';
@@ -105,11 +108,11 @@ export default function InfaqSettingsPage() {
       }
 
       // Refresh settings after save
-      await fetchSettings();
-      alert('Pengaturan infaq berhasil disimpan!');
+      setSettings(settingsToSave);
+      toast.success('Pengaturan infaq berhasil disimpan!');
     } catch (error: any) {
       console.error('Error saving infaq settings:', error);
-      alert('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));
+      toast.error('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }

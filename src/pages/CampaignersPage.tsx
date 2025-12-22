@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Users, Target, DollarSign, Eye, Menu, Bell, LogOut, Edit2, X } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, CheckCircle, XCircle, AlertCircle, Edit, Trash2, Menu, Bell, LogOut, Users, Target, DollarSign, Edit2, Eye, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
 // import { useAppName } from '../hooks/useAppName';
@@ -201,7 +202,7 @@ export default function CampaignersPage() {
             setEditModalOpen(false);
         } catch (error) {
             console.error('Error updating campaigner:', error);
-            alert('Gagal mengupdate data campaigner');
+            toast.error('Gagal mengupdate data campaigner');
         } finally {
             setSaving(false);
         }

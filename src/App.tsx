@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { supabase } from './lib/supabase';
 
 // Helper functions for global settings
@@ -321,6 +322,7 @@ function App() {
   return (
     <ThemeProvider>
       <Router>
+        <Toaster position="top-center" richColors />
         <AppContent />
       </Router>
     </ThemeProvider>

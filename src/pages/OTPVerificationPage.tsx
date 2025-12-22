@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
 import { useAppName } from '../hooks/useAppName';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import Header from '../components/Header';
@@ -93,7 +94,7 @@ export default function OTPVerificationPage() {
 
       if (error) throw error;
 
-      alert('OTP telah dikirim ulang ke email Anda');
+      toast.success('OTP telah dikirim ulang ke email Anda');
     } catch (err: any) {
       setError(err.message || 'Gagal mengirim OTP. Silakan coba lagi.');
     } finally {

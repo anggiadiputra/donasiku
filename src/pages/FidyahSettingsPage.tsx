@@ -1,10 +1,13 @@
+
 import { useState, useEffect } from 'react';
 import {
-    HandHeart,
-    Loader2,
+    ChevronLeft,
     Save,
-    Info
+    Loader2,
+    Info,
+    Search
 } from 'lucide-react';
+import { toast } from 'sonner';
 import DashboardLayout from '../components/DashboardLayout';
 import ImageUpload from '../components/ImageUpload';
 import RichTextEditor from '../components/RichTextEditor';
@@ -105,19 +108,18 @@ export default function FidyahSettingsPage() {
                 if (error) throw error;
             } else {
                 // Insert new
-                const { id, created_at, updated_at, ...settingsWithoutIdAndDates } = settingsToSave;
                 const { error } = await supabase
                     .from('fidyah_settings')
-                    .insert([settingsWithoutIdAndDates]);
+                    .insert([{ ...settingsToSave, id: undefined }]);
 
                 if (error) throw error;
             }
 
             await fetchData();
-            alert('Pengaturan Fidyah berhasil disimpan!');
+            toast.success('Pengaturan Fidyah berhasil disimpan!');
         } catch (error: any) {
             console.error('Error saving fidyah settings:', error);
-            alert('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));
+            toast.error('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));
         } finally {
             setSaving(false);
         }
