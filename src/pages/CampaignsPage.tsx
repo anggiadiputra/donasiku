@@ -49,7 +49,9 @@ export default function CampaignsPage() {
 
       let query = supabase
         .from('campaigns')
-        .select('*', { count: 'exact' });
+        .select('*', { count: 'exact' })
+        // Exclude system campaigns
+        .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 
       if (searchQuery) {
         query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);

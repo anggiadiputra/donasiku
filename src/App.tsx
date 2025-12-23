@@ -62,6 +62,7 @@ import PrayersPage from './pages/PrayersPage';
 import CampaignsListPage from './pages/CampaignsListPage';
 import CampaignDonorsPage from './pages/CampaignDonorsPage';
 import CampaignPrayersPage from './pages/CampaignPrayersPage';
+import NotFoundPage from './pages/NotFoundPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ThemeProvider from './components/ThemeProvider';
 
@@ -298,6 +299,9 @@ function AppContent() {
           </ProtectedRoute>
         }
       />
+
+      {/* 404 Page (Catch All) */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 

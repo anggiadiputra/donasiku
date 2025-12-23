@@ -45,6 +45,20 @@ export default function CampaignPage() {
 
   useEffect(() => {
     if (slug) {
+      // Redirect system campaigns to their dedicated pages
+      const systemRedirects: Record<string, string> = {
+        'infaq': '/infaq',
+        'fidyah': '/fidyah',
+        'zakat': '/zakat',
+        'wakaf': '/wakaf', // Assuming /wakaf exists, if not, remove or handle. Safe to assume dedicated pages exist or will exist for these main types.
+        'sedekah-subuh': '/sedekah-subuh'
+      };
+
+      if (systemRedirects[slug]) {
+        navigate(systemRedirects[slug], { replace: true });
+        return;
+      }
+
       fetchCampaign(slug);
     }
   }, [slug]);
