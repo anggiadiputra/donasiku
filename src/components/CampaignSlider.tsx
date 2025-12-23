@@ -58,7 +58,8 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                 let query = supabase
                     .from('campaigns')
                     .select('*')
-                    .eq('status', 'published');
+                    .eq('status', 'published')
+                    .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 
                 if (ids && Array.isArray(ids) && ids.length > 0) {
                     // Filter for valid UUIDs to prevent 400 Bad Request

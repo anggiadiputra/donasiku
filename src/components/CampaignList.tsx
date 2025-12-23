@@ -28,6 +28,7 @@ export default function CampaignList({ onCampaignClick }: CampaignListProps) {
         .from('campaigns')
         .select('*')
         .eq('status', 'published')
+        .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")')
         .order('created_at', { ascending: false })
         .limit(10);
 
