@@ -3,15 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Share2,
-  ShoppingCart,
   ChevronUp,
   ChevronDown,
   User,
-  Clock
+  Clock,
 } from 'lucide-react';
 import { supabase, Donation, InfaqSettings } from '../lib/supabase';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import ShareModal from '../components/ShareModal';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { getHoverColor } from '../utils/colorUtils';
@@ -24,6 +24,7 @@ export default function InfaqPage() {
   const [amount, setAmount] = useState<string>('125000');
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [showMoreDonors, setShowMoreDonors] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [donors, setDonors] = useState<Donation[]>([]);
   const [settings, setSettings] = useState<InfaqSettings | null>(null);
 
@@ -390,6 +391,7 @@ export default function InfaqPage() {
         </div>
 
         {/* Bottom Navigation Bar */}
+        {/* Bottom Navigation Bar */}
         <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
           <div className="px-4 py-3 flex items-center justify-between" style={{ backgroundColor: primaryColor }}>
             <button
@@ -401,24 +403,26 @@ export default function InfaqPage() {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <button
+              onClick={() => setShowShareModal(true)}
               className="text-white p-2 rounded-full transition-colors"
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = hoverColor}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               <Share2 className="w-5 h-5" />
             </button>
-            <button
-              className="text-white p-2 rounded-full transition-colors"
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = hoverColor}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-            >
-              <ShoppingCart className="w-5 h-5" />
-            </button>
+
             <button
               onClick={() => {
                 const amountNum = parseFloat(amount.replace(/[^\d]/g, '')) || 0;
                 if (amountNum > 0) {
-                  navigate(`/donasi?amount=${amountNum}&type=infaq`);
+                  navigate(`/infaq/bayar`, {
+                    state: {
+                      customAmount: amountNum,
+                      paymentType: 'infaq',
+                      messagePlaceholder: "Sampaikan niat berinfak",
+                      // Pass any other necessary info
+                    }
+                  });
                 }
               }}
               disabled={!amount || parseFloat(amount.replace(/[^\d]/g, '')) === 0}
@@ -426,7 +430,7 @@ export default function InfaqPage() {
               style={{ color: primaryColor }}
               onMouseEnter={(e) => {
                 if (!e.currentTarget.disabled) {
-                  e.currentTarget.style.backgroundColor = `${primaryColor}10`;
+                  e.currentTarget.style.backgroundColor = '#f9fafb';
                 }
               }}
               onMouseLeave={(e) => {
@@ -441,6 +445,15 @@ export default function InfaqPage() {
           </div>
         </div>
       </div>
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        shareUrl={`${window.location.origin}/infaq?utm_source=socialsharing_donor_web_infaq&utm_medium=share_campaign_copas&utm_campaign=share_detail_campaign`}
+        shareText="Mari tunaikan Infaq anda sekarang."
+      />
+
     </div>
   );
 }

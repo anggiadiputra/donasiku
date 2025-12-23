@@ -84,7 +84,7 @@ export default function PaymentStatusPage() {
         try {
             setChecking(true);
 
-            const { data, error } = await supabase.functions.invoke('check-duitku-transaction', {
+            const { error } = await supabase.functions.invoke('check-duitku-transaction', {
                 body: { merchantOrderId },
             });
 
@@ -248,7 +248,7 @@ export default function PaymentStatusPage() {
                                     <div className="p-4 bg-gray-50 rounded-lg">
                                         <p className="text-sm text-gray-600 mb-2">Campaign</p>
                                         <div className="flex items-center gap-3">
-                                            {transaction.campaigns.image_url && (
+                                            {transaction.campaigns.image_url && !(transaction.product_details?.toLowerCase().includes('infaq') || transaction.product_details?.toLowerCase().includes('fidyah')) && (
                                                 <img
                                                     src={transaction.campaigns.image_url}
                                                     alt={transaction.campaigns.title}
@@ -256,13 +256,22 @@ export default function PaymentStatusPage() {
                                                 />
                                             )}
                                             <div className="flex-1">
-                                                <p className="font-semibold text-gray-800">{transaction.campaigns.title}</p>
-                                                <button
-                                                    onClick={() => navigate(`/campaign/${transaction.campaigns?.slug}`)}
-                                                    className="text-sm text-orange-500 hover:text-orange-600 flex items-center gap-1 mt-1"
-                                                >
-                                                    Lihat Campaign <ExternalLink className="w-3 h-3" />
-                                                </button>
+                                                <p className="font-semibold text-gray-800">
+                                                    {(transaction.product_details?.toLowerCase().includes('infaq'))
+                                                        ? 'Bayar Infaq'
+                                                        : (transaction.product_details?.toLowerCase().includes('fidyah'))
+                                                            ? 'Bayar Fidyah'
+                                                            : transaction.campaigns.title
+                                                    }
+                                                </p>
+                                                {!(transaction.product_details?.toLowerCase().includes('infaq') || transaction.product_details?.toLowerCase().includes('fidyah')) && (
+                                                    <button
+                                                        onClick={() => navigate(`/campaign/${transaction.campaigns?.slug}`)}
+                                                        className="text-sm text-orange-500 hover:text-orange-600 flex items-center gap-1 mt-1"
+                                                    >
+                                                        Lihat Campaign <ExternalLink className="w-3 h-3" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -366,10 +375,21 @@ export default function PaymentStatusPage() {
 
                             {isSuccess && transaction.campaigns && (
                                 <button
-                                    onClick={() => navigate(`/campaign/${transaction.campaigns?.slug}`)}
+                                    onClick={() => {
+                                        const slug = transaction.campaigns?.slug;
+                                        if (slug === 'infaq') {
+                                            navigate('/infaq');
+                                        } else if (slug === 'fidyah') {
+                                            navigate('/fidyah');
+                                        } else {
+                                            navigate(`/campaign/${slug}`);
+                                        }
+                                    }}
                                     className="w-full bg-orange-500 text-white py-4 rounded-lg font-semibold hover:bg-orange-600 transition-colors"
                                 >
-                                    Lihat Campaign
+                                    {transaction.campaigns?.slug === 'infaq' ? 'Kembali ke Infaq' :
+                                        transaction.campaigns?.slug === 'fidyah' ? 'Kembali ke Fidyah' :
+                                            'Lihat Campaign'}
                                 </button>
                             )}
 

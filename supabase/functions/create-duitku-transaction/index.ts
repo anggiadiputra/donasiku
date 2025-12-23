@@ -54,11 +54,23 @@ async function sendEmail(to: string, subject: string, htmlBody: string) {
 
 async function sendWhatsApp(target: string, message: string) {
   const FONNTE_TOKEN = getEnv('FONNTE_TOKEN');
-  if (!FONNTE_TOKEN || !target) return;
+  if (!target) return;
+
+  // Sanitize Phone Number
+  // 1. Remove non-digits
+  let formattedTarget = target.replace(/\D/g, '');
+  // 2. Replace 08 -> 628
+  if (formattedTarget.startsWith('08')) {
+    formattedTarget = '62' + formattedTarget.substring(1);
+  }
+  // 3. If starts with 8, add 62
+  if (formattedTarget.startsWith('8')) {
+    formattedTarget = '62' + formattedTarget;
+  }
 
   try {
     const form = new FormData();
-    form.append('target', target);
+    form.append('target', formattedTarget);
     form.append('message', message);
 
     await fetch('https://api.fonnte.com/send', {
@@ -93,18 +105,38 @@ serve(async (req) => {
     const body = await req.json()
     const {
       campaignId,
+      campaignSlug, // New parameter for lazy creation
       amount,
       paymentMethod,
       customerName,
+      originalName, // New: Real name if anonymous
+      isAnonymous,  // New: Flag
       customerEmail,
       customerPhone,
       customerMessage,
       returnUrl,
-      productDetails, // Optional: custom product details for Fidyah
+      productDetails,
     } = body
 
-    // Fetch campaign (optional for Fidyah)
+    console.log('📝 Creating Transaction:', {
+      campaignId,
+      campaignSlug,
+      amount,
+      customerName,
+      isAnonymous
+    });
+
+    // Prepare Metadata
+    const metadata: any = {};
+    if (isAnonymous) {
+      metadata.is_anonymous = true;
+      metadata.real_name = originalName;
+    }
+
+    // Fetch or Create campaign
     let campaign = null
+
+    // 1. Try by ID first
     if (campaignId) {
       const { data, error: campaignError } = await supabase
         .from('campaigns')
@@ -114,6 +146,58 @@ serve(async (req) => {
 
       if (!campaignError && data) {
         campaign = data
+      }
+    }
+    // 2. Try by Slug (and create if missing)
+    else if (campaignSlug) {
+      const { data, error } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('slug', campaignSlug)
+        .maybeSingle()
+
+      if (data) {
+        campaign = data;
+      } else {
+        // Create System Campaign
+        let title = 'Program Donasi';
+        let category = 'Infaq';
+
+        if (campaignSlug === 'infaq') { title = 'Bayar Infaq'; category = 'Infaq'; }
+        if (campaignSlug === 'fidyah') { title = 'Bayar Fidyah'; category = 'Zakat'; }
+        if (campaignSlug === 'zakat') { title = 'Bayar Zakat'; category = 'Zakat'; }
+        if (campaignSlug === 'sedekah-subuh') { title = 'Sedekah Subuh'; category = 'Sedekah'; }
+        if (campaignSlug === 'wakaf') { title = 'Bayar Wakaf'; category = 'Wakaf'; }
+
+        // Get category ID
+        const { data: catData } = await supabase
+          .from('categories')
+          .select('id')
+          .eq('slug', category.toLowerCase())
+          .maybeSingle();
+
+        const { data: newCampaign, error: createError } = await supabase
+          .from('campaigns')
+          .insert({
+            title: title,
+            slug: campaignSlug,
+            description: `Fasilitas pembayaran ${title} rutin.`,
+            category: category,
+            category_id: catData?.id,
+            target_amount: 0,
+            current_amount: 0,
+            status: 'published',
+            user_id: null // System campaign
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('❌ Failed to create system campaign:', createError);
+        } else {
+          console.log('✅ Created system campaign:', title);
+          campaign = newCampaign;
+        }
       }
     }
 
@@ -142,18 +226,18 @@ serve(async (req) => {
 
     // Construct Callback URL
     // If DUITKU_CALLBACK_URL is set, use it.
-    // Otherwise, construct dynamic Supabase Function URL: https://lrycaoioytevqfvmrhij.supabase.co/functions/v1/duitku-callback
+    // Otherwise, construct dynamic Supabase Function URL: https://[project-id].supabase.co/functions/v1/check-duitku-transaction
     let callbackUrl = getEnv('DUITKU_CALLBACK_URL');
 
     if (!callbackUrl) {
       const sbUrl = Deno.env.get('SUPABASE_URL');
       if (sbUrl && !sbUrl.includes('localhost') && !sbUrl.includes('127.0.0.1')) {
-        callbackUrl = `${sbUrl}/functions/v1/duitku-callback`;
+        callbackUrl = `${sbUrl}/functions/v1/check-duitku-transaction`;
       } else {
         // Fallback to known production URL (based on project ID)
         // This is a safety measure if SUPABASE_URL is missing or local
         console.log('⚠️ SUPABASE_URL missing or local. Using hardcoded production URL.');
-        callbackUrl = 'https://lrycaoioytevqfvmrhij.supabase.co/functions/v1/duitku-callback';
+        callbackUrl = 'https://lrycaoioytevqfvmrhij.supabase.co/functions/v1/check-duitku-transaction';
       }
       console.log('ℹ️ Using generated Callback URL:', callbackUrl);
     }
@@ -231,6 +315,7 @@ serve(async (req) => {
         return_url: finalReturnUrl,
         expiry_time: expiryTime.toISOString(),
         item_details: duitkuPayload.itemDetails,
+        metadata: metadata, // Save metadata
       })
       .select()
       .single()
@@ -247,11 +332,20 @@ serve(async (req) => {
     // ----------------------------------------------------
     const invoiceLink = `${APP_URL}/invoice/${invoiceCode}`;
     const formattedAmount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
-    const donorName = customerName || 'Orang Baik';
+
+    // Custom Greeting & Details for Anonymous interactions via WhatsApp
+    // User wants: "Halo Hamba Allah (Budi)" and "Keperluan: Infaq... (Budi)"
+    const greetingName = (isAnonymous && originalName)
+      ? `${customerName} (${originalName})`
+      : (customerName || 'Orang Baik');
+
+    const messageDetails = (isAnonymous && originalName)
+      ? `${finalProductDetails} (${originalName})`
+      : finalProductDetails;
 
     // 1. WhatsApp
     if (customerPhone) {
-      const waMessage = `Halo ${donorName},\n\nTerima kasih atas niat baik Anda untuk berdonasi.\n\nMohon selesaikan pembayaran sebesar *${formattedAmount}*.\n\nKeperluan: ${finalProductDetails}\n\nUntuk instruksi pembayaran, silakan klik link di bawah ini:\n${invoiceLink}\n\nTerima kasih.`;
+      const waMessage = `Halo ${greetingName},\n\nTerima kasih atas niat baik Anda untuk berdonasi.\n\nMohon selesaikan pembayaran sebesar *${formattedAmount}*.\n\nKeperluan: ${messageDetails}\n\nUntuk instruksi pembayaran, silakan klik link di bawah ini:\n${invoiceLink}\n\nTerima kasih.`;
       await sendWhatsApp(customerPhone, waMessage);
     }
 
@@ -260,11 +354,11 @@ serve(async (req) => {
       const subject = `Menunggu Pembayaran: ${finalProductDetails}`;
       const html = `
             <h2>Menunggu Pembayaran</h2>
-            <p>Halo <strong>${donorName}</strong>,</p>
+            <p>Halo <strong>${greetingName}</strong>,</p>
             <p>Terima kasih atas donasi Anda. Berikut adalah detail pembayaran yang harus diselesaikan:</p>
             <ul>
                 <li><strong>Jumlah:</strong> ${formattedAmount}</li>
-                <li><strong>Keperluan:</strong> ${finalProductDetails}</li>
+                <li><strong>Keperluan:</strong> ${messageDetails}</li>
                 <li><strong>No. Invoice:</strong> ${invoiceCode}</li>
             </ul>
             <p>Silakan klik tombol di bawah ini untuk melihat instruksi pembayaran:</p>

@@ -25,6 +25,10 @@ interface Transaction {
     duitku_reference: string;
     payment_url: string;
     product_details?: string;
+    metadata?: {
+        real_name?: string;
+        is_anonymous?: boolean;
+    };
 }
 
 interface Campaign {
@@ -391,10 +395,15 @@ export default function DonasiDashboardPage() {
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-xs font-bold text-gray-600">
-                                                                {tx.customer_name?.charAt(0).toUpperCase() || '?'}
+                                                                {(tx.metadata?.real_name || tx.customer_name || '?').charAt(0).toUpperCase()}
                                                             </div>
                                                             <div>
-                                                                <div className="font-medium text-gray-900">{tx.customer_name || 'Hamba Allah'}</div>
+                                                                <div className="font-medium text-gray-900">
+                                                                    {tx.metadata?.real_name || tx.customer_name || 'Hamba Allah'}
+                                                                    {tx.metadata?.is_anonymous && (
+                                                                        <span className="text-xs text-gray-500 ml-1 italic">(Anonim)</span>
+                                                                    )}
+                                                                </div>
                                                                 <div className="text-xs text-gray-500">{tx.invoice_code}</div>
                                                             </div>
                                                         </div>
@@ -403,7 +412,11 @@ export default function DonasiDashboardPage() {
                                                         <div className="font-semibold text-gray-900">{formatCurrency(tx.amount)}</div>
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        {campaigns[tx.campaign_id] ? (
+                                                        {tx.product_details?.toLowerCase().includes('infaq') ? (
+                                                            <div className="max-w-xs truncate text-gray-900 font-medium" title={tx.product_details}>
+                                                                {tx.product_details}
+                                                            </div>
+                                                        ) : campaigns[tx.campaign_id] ? (
                                                             <button
                                                                 onClick={() => navigate(`/campaign/${campaigns[tx.campaign_id].slug}`)}
                                                                 className="max-w-xs truncate text-left text-blue-600 hover:text-blue-800 hover:underline transition-colors"

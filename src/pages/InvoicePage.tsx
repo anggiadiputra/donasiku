@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { Copy, CheckCircle, Clock, Loader2, Printer } from 'lucide-react';
 import QRCode from 'react-qr-code';
@@ -89,8 +89,10 @@ export default function InvoicePage() {
             duitkuReference: tx.duitku_reference,
             vaNumber: tx.va_number,
             qrString: tx.qr_string,
-            invoiceCode: tx.invoice_code
+            invoiceCode: tx.invoice_code,
+            productDetails: tx.product_details
           };
+
 
           setData({
             transaction: mappedTransaction,
@@ -134,7 +136,22 @@ export default function InvoicePage() {
   }, [invoiceCode, location.state]);
 
   const transaction = data?.transaction;
-  const campaign = data?.campaign;
+
+
+  // Override campaign title logic for Infaq/Fidyah
+  const originalCampaign = data?.campaign;
+  const campaign = useMemo(() => {
+    if (originalCampaign && transaction?.productDetails) {
+      const details = transaction.productDetails.toLowerCase();
+      if (details.includes('infaq')) {
+        return { ...originalCampaign, title: 'Bayar Infaq' };
+      } else if (details.includes('fidyah')) {
+        return { ...originalCampaign, title: 'Bayar Fidyah' };
+      }
+    }
+    return originalCampaign;
+  }, [originalCampaign, transaction]);
+
   const customerName = data?.customerName || 'Orang Baik';
   const paymentMethodName = data?.paymentMethodName;
 
@@ -211,6 +228,17 @@ export default function InvoicePage() {
 
     return () => clearInterval(interval);
   }, [merchantOrderId]);
+
+  // Handle success redirection
+  useEffect(() => {
+    if (showModal && modalType === 'success' && transaction?.merchantOrderId) {
+      const timer = setTimeout(() => {
+        navigate(`/payment/success?merchantOrderId=${transaction.merchantOrderId}`);
+      }, 3000); // Redirect after 3 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [showModal, modalType, transaction, navigate]);
 
   if (loading) {
     return <InvoicePageSkeleton />;
@@ -334,6 +362,8 @@ export default function InvoicePage() {
       setIsChecking(false);
     }
   };
+
+
 
   // Calculate total amount using fetched payment fee
   const totalAmount = transaction.amount + paymentFee;
@@ -460,7 +490,10 @@ export default function InvoicePage() {
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  if (campaign?.slug) {
+                  const details = transaction.productDetails?.toLowerCase() || '';
+                  if (details.includes('infaq') || details.includes('fidyah')) {
+                    navigate('/');
+                  } else if (campaign?.slug) {
                     navigate(`/campaign/${campaign.slug}`);
                   } else {
                     navigate('/');

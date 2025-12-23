@@ -77,9 +77,21 @@ async function sendWhatsApp(target: string, message: string) {
         return;
     }
 
+    // Sanitize Phone Number
+    // 1. Remove non-digits
+    let formattedTarget = target.replace(/\D/g, '');
+    // 2. Replace 08 -> 628
+    if (formattedTarget.startsWith('08')) {
+        formattedTarget = '62' + formattedTarget.substring(1);
+    }
+    // 3. If starts with 8, add 62
+    if (formattedTarget.startsWith('8')) {
+        formattedTarget = '62' + formattedTarget;
+    }
+
     try {
         const form = new FormData();
-        form.append('target', target);
+        form.append('target', formattedTarget); // Use cleaned number
         form.append('message', message);
 
         const response = await fetch('https://api.fonnte.com/send', {
@@ -200,7 +212,17 @@ serve(async (req) => {
             }).format(transaction.amount);
 
             const donorName = transaction.customer_name || 'Hamba Allah';
-            const campaignTitle = transaction.campaigns?.title || 'Program Kebaikan';
+            let campaignTitle = transaction.campaigns?.title || 'Program Kebaikan';
+
+            // Override campaign title based on product details for Fidyah/Infaq
+            if (transaction.product_details) {
+                const details = transaction.product_details.toLowerCase();
+                if (details.includes('fidyah')) {
+                    campaignTitle = 'Bayar Fidyah';
+                } else if (details.includes('infaq')) {
+                    campaignTitle = 'Bayar Infaq';
+                }
+            }
 
 
             // URLs
@@ -211,26 +233,28 @@ serve(async (req) => {
             }
             APP_URL = APP_URL.replace(/\/$/, '');
 
-            const invoiceCode = transaction.invoice_code || transaction.merchant_order_id; // Fallback
-            const invoiceLink = `${APP_URL}/invoice/${invoiceCode}`;
-
-            // ---------------------------------------------------------
-            // 2. DONOR NOTIFICATION
-            // ---------------------------------------------------------
-
             // A. WhatsApp to Donor
             if (transaction.customer_phone) {
-                const { data: settings } = await supabase.from('app_settings').select('whatsapp_success_template').single();
-                let message = settings?.whatsapp_success_template ||
-                    'Alhamdulillah, terima kasih Kak {name}. Donasi sebesar {amount} untuk {campaign} telah kami terima. Semoga berkah.';
+                console.log("🔔 Donor Phone:", transaction.customer_phone);
 
-                message = message
-                    .replace(/{name}/g, donorName)
-                    .replace(/{amount}/g, formattedAmount)
-                    .replace(/{campaign}/g, campaignTitle);
+                // Construct Invoice Link
+                const invoiceLink = `${APP_URL}/invoice/${transaction.invoice_code}`;
 
-                // Append Invoice Link
-                message += `\n\nLihat Invoice: ${invoiceLink}`;
+                let message = '';
+
+                // Determine template based on transaction type
+                const lowerDetails = transaction.product_details?.toLowerCase() || '';
+
+                if (lowerDetails.includes('infaq')) {
+                    // Infaq Template
+                    message = `Alhamdulillah, terima kasih Kak ${donorName}. Infaq sebesar ${formattedAmount} telah kami terima. Semoga menjadi amal jariyah yang tak terputus pahalanya. 🤲\n\nLihat Invoice: ${invoiceLink}`;
+                } else if (lowerDetails.includes('fidyah')) {
+                    // Fidyah Template
+                    message = `Alhamdulillah, terima kasih Kak ${donorName}. Pembayaran Fidyah sebesar ${formattedAmount} telah kami terima. Semoga menjadi amal jariyah yang tak terputus pahalanya. 🤲\n\nLihat Invoice: ${invoiceLink}`;
+                } else {
+                    // Default Campaign Template
+                    message = `Alhamdulillah, terima kasih Kak ${donorName}. Donasi sebesar ${formattedAmount} untuk ${campaignTitle} telah kami terima. Semoga berkah.\n\nLihat Invoice: ${invoiceLink}`;
+                }
 
                 await sendWhatsApp(transaction.customer_phone, message);
             }
@@ -251,7 +275,11 @@ serve(async (req) => {
             // ---------------------------------------------------------
             // 3. CAMPAIGNER NOTIFICATION
             // ---------------------------------------------------------
-            if (transaction.campaigns?.user_id) {
+            // Only send if it's NOT a special transaction (Infaq/Fidyah)
+            const isSpecialTransaction = transaction.product_details?.toLowerCase().includes('infaq') ||
+                transaction.product_details?.toLowerCase().includes('fidyah');
+
+            if (transaction.campaigns?.user_id && !isSpecialTransaction) {
                 // Fetch Campaigner Profile & Email
                 const { data: campaignerProfile } = await supabase
                     .from('profiles')

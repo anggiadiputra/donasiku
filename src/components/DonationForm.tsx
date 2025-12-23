@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Check, ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -12,6 +12,7 @@ export default function DonationForm() {
   const primaryColor = usePrimaryColor();
   const location = useLocation();
   const isFidyahPage = location.pathname === '/fidyah/bayar';
+  const isInfaqPage = location.pathname === '/infaq/bayar';
   const { slug } = useParams<{ slug?: string }>();
   const [campaign, setCampaign] = useState<Campaign | null>(
     (location.state as { campaign?: Campaign })?.campaign || null
@@ -47,6 +48,9 @@ export default function DonationForm() {
         const foundCampaign = findCampaignBySlug(data, campaignSlug);
         if (foundCampaign) {
           setCampaign(foundCampaign);
+        } else if (data.length > 0) {
+          // Fallback: Use the most recent campaign if specific one not found
+          setCampaign(data[0]);
         }
       }
     } catch (error) {
@@ -88,7 +92,12 @@ export default function DonationForm() {
   const [message, setMessage] = useState('');
 
   // Use campaign's preset amounts if available, otherwise use defaults
-  const donationAmounts = (() => {
+  const donationAmounts = useMemo(() => {
+    // Hide presets for Fidyah and Infaq pages
+    if (isFidyahPage || isInfaqPage) {
+      return [];
+    }
+
     if (campaign?.preset_amounts && Array.isArray(campaign.preset_amounts)) {
       // Filter out null/0 values and map to the format we need
       const validAmounts = campaign.preset_amounts
@@ -128,7 +137,7 @@ export default function DonationForm() {
 
     // Default fallback amounts
     return [];
-  })();
+  }, [campaign]);
 
   // Set initial selected amount to first preset amount
   useEffect(() => {
@@ -258,7 +267,7 @@ export default function DonationForm() {
     try {
       setIsProcessing(true);
 
-      const anonymousName = isFidyahPage ? 'Hamba Allah' : 'Orang Baik';
+      const anonymousName = (isFidyahPage || isInfaqPage) ? 'Hamba Allah' : 'Orang Baik';
 
 
 
@@ -267,20 +276,48 @@ export default function DonationForm() {
       const numberOfDays = (location.state as any)?.numberOfDays || 1;
       const productDetails = isFidyahPage
         ? `Bayar Fidyah atas nama ${hideName ? anonymousName : fullName} untuk ${numberOfDays} hari`
-        : undefined;
+        : isInfaqPage
+          ? `Infaq atas nama ${hideName ? anonymousName : fullName}`
+          : undefined;
+
+      // Determine campaign ID or Slug
+      let finalCampaignId = displayCampaign.id;
+      let finalCampaignSlug = undefined;
+
+      // If we are strictly on a system page (Infaq/Fidyah) and the 'displayCampaign' logic
+      // defaulted to the fallback (latest campaign) because the specific slug didn't exist,
+      // we should instead tell the backend to use/create the specific system campaign.
+      // We detect this by checking if we have a known system slug but the displayCampaign doesn't match it.
+
+      const targetSlug = isFidyahPage ? 'fidyah' : isInfaqPage ? 'infaq' : undefined;
+
+      // If we have a target slug, pass it to the backend. 
+      // The backend will create/find the system campaign.
+      if (targetSlug) {
+        finalCampaignSlug = targetSlug;
+        // We can also clear finalCampaignId to force backend to look up by slug,
+        // UNLESS displayCampaign WAS actually the correct one.
+        // Safe bet: If displayCampaign.slug !== targetSlug, clear ID using slug.
+        if (displayCampaign.slug !== targetSlug) {
+          finalCampaignId = undefined; // Force backend to use slug
+        }
+      }
 
       // Call Edge Function to create transaction
       const { data: transaction, error: transactionError } = await supabase.functions.invoke('create-duitku-transaction', {
         body: {
-          campaignId: displayCampaign.id,
-          amount: amount, // Assuming 'amount' is the correct variable from the context
-          paymentMethod: paymentMethod, // Assuming 'paymentMethod' is the correct variable from the context
+          campaignId: finalCampaignId,
+          campaignSlug: finalCampaignSlug, // Pass slug
+          amount: amount,
+          paymentMethod: paymentMethod,
           customerName: hideName ? anonymousName : fullName,
-          customerEmail: email || `${phone} @donasiku.com`, // Keeping original logic for email
+          originalName: fullName, // Pass real name for admin dashboard
+          isAnonymous: hideName,  // Flag for metadata
+          customerEmail: email || `${phone}@donasiku.com`,
           customerPhone: phone,
-          customerMessage: message || '', // Keeping original logic for message
-          returnUrl: `${window.location.origin} /payment/success`, // Keeping original logic for returnUrl
-          productDetails: productDetails, // Pass the custom details
+          customerMessage: message || '',
+          returnUrl: `${window.location.origin}/payment/success`,
+          productDetails: productDetails,
         },
       });
 
@@ -295,7 +332,7 @@ export default function DonationForm() {
 
 
         // Navigate to invoice page with transaction data
-        navigate(`/ invoice / ${transaction.transaction.invoiceCode} `, {
+        navigate(`/invoice/${transaction.transaction.invoiceCode}`, {
           state: {
             transaction: transaction.transaction,
             campaign: displayCampaign,
@@ -303,7 +340,7 @@ export default function DonationForm() {
             customerPhone: phone,
             customerEmail: email,
             paymentMethodName: paymentMethodName, // Full name from PaymentMethodSelector
-            from: isFidyahPage ? '/fidyah' : undefined,
+            from: isFidyahPage ? '/fidyah' : isInfaqPage ? '/infaq' : undefined,
           },
         });
       } else {
@@ -346,7 +383,7 @@ export default function DonationForm() {
               <ArrowLeft className="w-6 h-6 text-gray-700" />
             </button>
             <h1 className="text-base font-normal text-gray-800 flex-1 truncate">
-              {isFidyahPage ? 'Bayar Fidyah' : displayCampaign.title}
+              {isFidyahPage ? 'Bayar Fidyah' : isInfaqPage ? 'Bayar Infaq' : displayCampaign.title}
             </h1>
           </div>
         </div>
@@ -367,8 +404,8 @@ export default function DonationForm() {
               </div>
             )}
 
-            {/* Program Information - Hide on Fidyah Page since Header already says Bayar Fidyah */}
-            {!isFidyahPage && (
+            {/* Program Information - Hide on Fidyah/Infaq Page since Header already says Bayar Fidyah/Infaq */}
+            {!isFidyahPage && !isInfaqPage && (
               <div className="mb-6">
                 <div>
                   <p className="text-sm text-gray-600 mb-2">Anda akan berdonasi dalam program:</p>
@@ -388,7 +425,7 @@ export default function DonationForm() {
                       type="button"
                       onClick={() => handleAmountSelect(item.value)}
                       disabled={isProcessing}
-                      className={`relative p - 4 rounded - lg border - 2 transition - all ${selectedAmount === item.value
+                      className={`relative p-4 rounded-lg border-2 transition-all ${selectedAmount === item.value
                         ? 'border-transparent'
                         : 'bg-white border-gray-200 hover:border-gray-300'
                         } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''} `}
@@ -426,7 +463,7 @@ export default function DonationForm() {
                     type="button"
                     onClick={() => handleAmountSelect(null)}
                     disabled={isProcessing}
-                    className={`relative p - 4 rounded - lg border - 2 transition - all ${selectedAmount === null
+                    className={`relative p-4 rounded-lg border-2 transition-all ${selectedAmount === null
                       ? 'border-transparent'
                       : 'bg-white border-gray-200 hover:border-gray-300'
                       } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''} `}
@@ -509,18 +546,18 @@ export default function DonationForm() {
 
               <div className="flex items-center justify-between mb-4">
                 <label className="text-sm text-gray-700">
-                  {isFidyahPage ? 'Sembunyikan nama saya (Hamba Allah)' : 'Sembunyikan nama saya (Orang Baik)'}
+                  {(isFidyahPage || isInfaqPage) ? 'Sembunyikan nama saya (Hamba Allah)' : 'Sembunyikan nama saya (Orang Baik)'}
                 </label>
                 <button
                   type="button"
                   onClick={() => setHideName(!hideName)}
                   disabled={isProcessing}
-                  className={`relative w - 12 h - 6 rounded - full transition - colors ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''} `}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
                   style={{ backgroundColor: hideName ? primaryColor : '#d1d5db' }}
                 >
                   <span
-                    className={`absolute top - 1 left - 1 w - 4 h - 4 bg - white rounded - full transition - transform ${hideName ? 'translate-x-6' : 'translate-x-0'
-                      } `}
+                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${hideName ? 'translate-x-6' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               </div>
@@ -580,7 +617,7 @@ export default function DonationForm() {
                 Memproses Pembayaran...
               </>
             ) : (
-              `${isFidyahPage ? 'Tunaikan' : 'Donasi'} - ${formatCurrency(getDisplayAmount())} `
+              `${(isFidyahPage || isInfaqPage) ? 'Tunaikan' : 'Donasi'} - ${formatCurrency(getDisplayAmount())} `
             )}
           </button>
         </div>

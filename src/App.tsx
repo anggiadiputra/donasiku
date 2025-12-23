@@ -163,6 +163,7 @@ function AppContent() {
       <Route path="/payment/failed" element={<PaymentStatusPage />} />
       <Route path="/zakat" element={<ZakatPage />} />
       <Route path="/infaq" element={<InfaqPage />} />
+      <Route path="/infaq/bayar" element={<DonationForm />} />
       <Route path="/fidyah" element={<FidyahPage />} />
       <Route path="/fidyah/bayar" element={<DonationForm />} />
       <Route path="/ziswaf" element={<ZiswafPage />} />

@@ -577,11 +577,9 @@ function SummaryCard({ title, value, subValue, trend, trendPositive, data }: any
         </div>
         {/* Mini Sparkline Chart */}
         <div className="w-[80px] h-[40px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data.map((v: any, i: any) => ({ i, v }))}>
-              <Line type="monotone" dataKey="v" stroke={trendPositive !== false ? "#10B981" : "#EF4444"} strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
+          <LineChart width={80} height={40} data={data.map((v: any, i: any) => ({ i, v }))}>
+            <Line type="monotone" dataKey="v" stroke={trendPositive !== false ? "#10B981" : "#EF4444"} strokeWidth={2} dot={false} />
+          </LineChart>
         </div>
       </div>
 
