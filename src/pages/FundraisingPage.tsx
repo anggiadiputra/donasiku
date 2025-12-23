@@ -42,6 +42,7 @@ export default function FundraisingPage() {
       const { data: campaigns, error: campError } = await supabase
         .from('campaigns')
         .select('*')
+        .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")')
         .order('created_at', { ascending: false });
 
       if (campError) throw campError;
@@ -72,7 +73,7 @@ export default function FundraisingPage() {
       });
 
       // Construct the list
-      const combinedPrograms = [];
+      const combinedPrograms: any[] = [];
 
       // Add Virtual Programs first (High priority)
       // Only add if they have > 0 amount? Or always show? User asked for these programs explicitly.

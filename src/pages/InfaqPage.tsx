@@ -6,7 +6,6 @@ import {
   ChevronUp,
   ChevronDown,
   User,
-  Clock,
 } from 'lucide-react';
 import { supabase, Donation, InfaqSettings } from '../lib/supabase';
 import Header from '../components/Header';
@@ -23,9 +22,9 @@ export default function InfaqPage() {
   const hoverColor = getHoverColor(primaryColor);
   const [amount, setAmount] = useState<string>('125000');
   const [showFullDescription, setShowFullDescription] = useState(false);
-  const [showMoreDonors, setShowMoreDonors] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [donors, setDonors] = useState<Donation[]>([]);
+  const [totalDonors, setTotalDonors] = useState(0);
   const [settings, setSettings] = useState<InfaqSettings | null>(null);
 
   useEffect(() => {
@@ -65,12 +64,14 @@ export default function InfaqPage() {
 
   const fetchRecentDonors = async () => {
     try {
+      // 1. Fetch Data (Recent 5)
       const { data, error } = await supabase
         .from('transactions')
         .select('*')
         .eq('status', 'success')
+        .ilike('product_details', '%Infaq%') // Add filter explicitly just in case
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(5);
 
       if (error) {
         console.error('Error fetching donors:', error);
@@ -85,9 +86,24 @@ export default function InfaqPage() {
           campaign_id: tx.campaign_id,
           payment_method: tx.payment_method,
           status: tx.status,
+          message: tx.customer_message
         })) || [];
-        setDonors(mappedDonors as Donation[]);
+        setDonors(mappedDonors as (Donation & { message?: string })[]);
       }
+
+      // 2. Fetch Total Count
+      const { count } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'success')
+        .ilike('product_details', '%Infaq%'); // Add filter explicitly
+
+      if (count !== null) {
+        setTotalDonors(count);
+      } else if (data) {
+        setTotalDonors(prev => Math.max(prev, data.length));
+      }
+
     } catch (error) {
       console.error('Error:', error);
     }
@@ -132,7 +148,9 @@ export default function InfaqPage() {
     return `${day} ${month} ${year} pukul ${hours}.${minutes}`;
   };
 
-  const displayedDonors = showMoreDonors ? donors : donors.slice(0, 5);
+  /* ... unused variables removed ... */
+
+
 
   return (
     <div className="fixed inset-0 bg-gray-100 flex justify-center">
@@ -287,41 +305,49 @@ export default function InfaqPage() {
 
             {/* Donatur Section */}
             <div>
-              <h3 className="text-lg font-bold text-gray-800 mb-4">Donatur</h3>
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Donatur ({totalDonors})</h3>
               <div className="space-y-3">
-                {displayedDonors.map((donor) => (
-                  <div key={donor.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                {donors.map((donor) => (
+                  <div key={donor.id} className="flex gap-3 border-b border-gray-50 pb-4 last:border-0 last:pb-0">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${primaryColor}20` }}>
                       <User className="w-5 h-5" style={{ color: primaryColor }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Clock className="w-3 h-3 text-gray-400" />
-                        <span className="text-xs text-gray-500">{formatDate(donor.created_at)}</span>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-sm font-bold text-gray-800">
+                            {donor.is_anonymous ? 'Hamba Allah' : donor.donor_name}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {formatDate(donor.created_at)}
+                          </p>
+                        </div>
+                        <p className="text-sm font-bold text-gray-800">
+                          {formatCurrency(donor.amount)}
+                        </p>
                       </div>
-                      <p className="text-sm font-semibold text-gray-800">
-                        {donor.is_anonymous ? 'Orang Baik' : (donor.donor_name || 'Hamba Allah')}
-                      </p>
-                      <p className="text-sm font-bold mt-1" style={{ color: primaryColor }}>
-                        {formatCurrency(donor.amount)}
-                      </p>
+                      {/* Show message if exists */}
+                      {((donor as any).message) && (
+                        <p className="text-xs text-gray-600 mt-2 bg-gray-50 p-2 rounded italic">
+                          "{((donor as any).message)}"
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
-                {donors.length > 5 && (
+                {donors.length === 0 && (
+                  <p className="text-sm text-gray-500 italic">Belum ada donatur.</p>
+                )}
+                {totalDonors > 0 && (
                   <button
-                    onClick={() => setShowMoreDonors(!showMoreDonors)}
-                    className="w-full font-semibold text-sm flex items-center justify-center gap-1 transition-colors py-2"
+                    onClick={() => navigate('/infaq/donasi')}
+                    className="w-full font-semibold text-sm flex items-center justify-center gap-1 transition-colors py-2 mt-2"
                     style={{ color: primaryColor }}
-                    onMouseEnter={(e) => e.currentTarget.style.color = hoverColor}
-                    onMouseLeave={(e) => e.currentTarget.style.color = primaryColor}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                   >
-                    {showMoreDonors ? 'Tampilkan Sedikit' : 'Lihat Selengkapnya'}
-                    {showMoreDonors ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
+                    Lihat Selengkapnya
+                    <ChevronUp className="w-4 h-4 rotate-90" />
                   </button>
                 )}
               </div>

@@ -53,8 +53,10 @@ import ZakatPage from './pages/ZakatPage';
 import ZakatSettingsPage from './pages/ZakatSettingsPage';
 import InfaqPage from './pages/InfaqPage';
 import InfaqSettingsPage from './pages/InfaqSettingsPage';
+import InfaqDonationsPage from './pages/InfaqDonationsPage';
 import FidyahPage from './pages/FidyahPage';
 import FidyahSettingsPage from './pages/FidyahSettingsPage';
+import FidyahDonationsPage from './pages/FidyahDonationsPage';
 import ZiswafPage from './pages/ZiswafPage';
 import DonatursPage from './pages/DonatursPage';
 import CampaignersPage from './pages/CampaignersPage';
@@ -165,8 +167,10 @@ function AppContent() {
       <Route path="/zakat" element={<ZakatPage />} />
       <Route path="/infaq" element={<InfaqPage />} />
       <Route path="/infaq/bayar" element={<DonationForm />} />
+      <Route path="/infaq/donasi" element={<InfaqDonationsPage />} />
       <Route path="/fidyah" element={<FidyahPage />} />
       <Route path="/fidyah/bayar" element={<DonationForm />} />
+      <Route path="/fidyah/donasi" element={<FidyahDonationsPage />} />
       <Route path="/ziswaf" element={<ZiswafPage />} />
       <Route path="/prayers" element={<PrayersPage />} />
 

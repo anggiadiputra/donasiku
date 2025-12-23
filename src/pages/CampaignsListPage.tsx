@@ -77,7 +77,8 @@ export default function CampaignsListPage() {
       let query = supabase
         .from('campaigns')
         .select('*')
-        .eq('status', 'published');
+        .eq('status', 'published')
+        .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 
       // Apply category filter
       if (selectedCategory) {
@@ -103,7 +104,8 @@ export default function CampaignsListPage() {
           // Try alternative query with filters
           let altQuery = supabase
             .from('campaigns')
-            .select('*');
+            .select('*')
+            .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 
           if (selectedCategory) {
             altQuery = altQuery.eq('category_id', selectedCategory);

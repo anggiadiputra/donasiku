@@ -28,6 +28,7 @@ export default function FidyahPage() {
     const [settings, setSettings] = useState<FidyahSettings | null>(null);
     const [targetCampaign, setTargetCampaign] = useState<Campaign | null>(null);
     const [donors, setDonors] = useState<Donation[]>([]);
+    const [totalDonors, setTotalDonors] = useState(0);
 
     const [days, setDays] = useState(1);
     const [showFullDescription, setShowFullDescription] = useState(false);
@@ -80,7 +81,8 @@ export default function FidyahPage() {
 
     const fetchDonors = async (campaignId?: string | null) => {
         try {
-            let query = supabase
+            // 1. Fetch Data (Recent 5)
+            let dataQuery = supabase
                 .from('transactions')
                 .select('*')
                 .eq('status', 'success')
@@ -88,13 +90,33 @@ export default function FidyahPage() {
                 .limit(5);
 
             if (campaignId) {
-                query = query.eq('campaign_id', campaignId);
+                dataQuery = dataQuery.eq('campaign_id', campaignId);
             } else {
-                // Only fetch Fidyah transactions if no campaign specified
-                query = query.ilike('product_details', '%Fidyah%');
+                dataQuery = dataQuery.ilike('product_details', '%Fidyah%');
             }
 
-            const { data } = await query;
+            const { data } = await dataQuery;
+
+            // 2. Fetch Total Count
+            let countQuery = supabase
+                .from('transactions')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'success');
+
+            if (campaignId) {
+                countQuery = countQuery.eq('campaign_id', campaignId);
+            } else {
+                countQuery = countQuery.ilike('product_details', '%Fidyah%');
+            }
+
+            const { count } = await countQuery;
+
+            if (count !== null) {
+                setTotalDonors(count);
+            } else if (data) {
+                // Fallback if count fails but data exists
+                setTotalDonors(prev => Math.max(prev, data.length));
+            }
 
             if (data) {
                 const mappedDonors = data.map(tx => ({
@@ -312,7 +334,7 @@ export default function FidyahPage() {
 
                         {/* Donatur */}
                         <div className="p-4 mb-2">
-                            <h3 className="font-bold text-gray-900 mb-4">Donatur ({targetCampaign?.donor_count || 0})</h3>
+                            <h3 className="font-bold text-gray-900 mb-4">Donatur ({totalDonors})</h3>
                             <div className="space-y-4">
                                 {donors.map(donor => (
                                     <div key={donor.id} className="flex gap-3">
@@ -344,12 +366,16 @@ export default function FidyahPage() {
                                 )}
                             </div>
 
-                            {donors.length > 0 && (
+                            {totalDonors > 0 && (
                                 <button
-                                    className="w-full mt-4 py-2 border rounded-full text-sm font-semibold hover:bg-gray-50"
-                                    style={{ borderColor: `${primaryColor}40`, color: primaryColor }}
+                                    onClick={() => navigate('/fidyah/donasi')}
+                                    className="w-full font-semibold text-sm flex items-center justify-center gap-1 transition-colors py-2 mt-2"
+                                    style={{ color: primaryColor }}
+                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                                 >
-                                    Lihat Semua
+                                    Lihat Selengkapnya
+                                    <ChevronUp className="w-4 h-4 rotate-90" />
                                 </button>
                             )}
                         </div>
