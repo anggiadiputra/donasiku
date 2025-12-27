@@ -264,7 +264,7 @@ export default function DonationForm() {
       return;
     }
 
-    if (!email) {
+    if (!email || !email.trim()) {
       toast.error('Silakan isi alamat email');
       return;
     }
@@ -402,7 +402,7 @@ export default function DonationForm() {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto no-scrollbar scroll-smooth">
-          <form onSubmit={handleSubmit} className="px-4 py-6">
+          <form id="donation-form" onSubmit={handleSubmit} className="px-4 py-6">
             {/* Campaign Image - Display when accessed via /campaign/:slug/donasi-amount */}
             {slug && displayCampaign.image_url && (
               <div className="mb-6">
@@ -547,7 +547,7 @@ export default function DonationForm() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Nama Lengkap"
-                required
+                required={!hideName}
 
                 disabled={isProcessing}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none mb-4 disabled:opacity-50"
@@ -620,7 +620,7 @@ export default function DonationForm() {
         <div className="bg-white border-t border-gray-200 p-4 shadow-lg flex-none">
           <button
             type="submit"
-            onClick={handleSubmit}
+            form="donation-form"
             disabled={isProcessing}
             className="w-full text-white py-4 rounded-lg font-bold text-lg hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             style={{ backgroundColor: primaryColor }}
