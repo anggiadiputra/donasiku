@@ -249,8 +249,8 @@ export default function DonationForm() {
       return;
     }
 
-    if (!hideName && !fullName) {
-      toast.error('Silakan isi nama lengkap atau pilih sembunyikan nama');
+    if (!fullName) {
+      toast.error('Silakan isi nama lengkap');
       return;
     }
 
@@ -322,7 +322,7 @@ export default function DonationForm() {
           campaignSlug: finalCampaignSlug || '', // Pass slug or empty string if undefined
           amount: amount,
           paymentMethod: paymentMethod,
-          customerName: hideName ? anonymousName : fullName,
+          customerName: fullName,
           originalName: fullName, // Pass real name for admin dashboard
           isAnonymous: hideName,  // Flag for metadata
           customerEmail: email || `${phone}@donasiku.com`,
@@ -547,7 +547,7 @@ export default function DonationForm() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Nama Lengkap"
-                required={!hideName}
+                required
 
                 disabled={isProcessing}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none mb-4 disabled:opacity-50"

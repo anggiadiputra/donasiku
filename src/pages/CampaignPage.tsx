@@ -113,7 +113,7 @@ export default function CampaignPage() {
       // 1. Fetch ALL success transactions for statistics and donor list
       const { data: transactionsData, error: transactionsError } = await supabase
         .from('transactions')
-        .select('id, customer_name, customer_message, created_at, amount, amen_count')
+        .select('id, customer_name, customer_message, created_at, amount, amen_count, is_anonymous')
         .eq('campaign_id', campaignId)
         .eq('status', 'success')
         .order('created_at', { ascending: false });
@@ -350,7 +350,7 @@ export default function CampaignPage() {
                       {donors.slice(0, 3).map((t, i) => (
                         <div key={i} className="inline-flex h-5 w-5 rounded-full ring-1 ring-white bg-gray-100 items-center justify-center">
                           <span className="text-[9px] font-bold text-gray-500">
-                            {t.customer_name ? t.customer_name.charAt(0).toUpperCase() : '?'}
+                            {(t.is_anonymous || !t.customer_name) ? '?' : t.customer_name.charAt(0).toUpperCase()}
                           </span>
                         </div>
                       ))}
@@ -479,7 +479,7 @@ export default function CampaignPage() {
                 {displayedDonors.map((donor) => (
                   <div key={donor.id} className="flex gap-4 p-3 bg-gray-50 rounded-xl border border-gray-100">
                     <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center shrink-0">
-                      {!donor.customer_name ? (
+                      {!donor.customer_name || donor.is_anonymous ? (
                         <div className="w-5 h-5 bg-gray-200 rounded-full" />
                       ) : (
                         <span className="font-bold text-gray-500 text-sm">
@@ -489,7 +489,7 @@ export default function CampaignPage() {
                     </div>
                     <div className="flex-1">
                       <p className="font-bold text-gray-800 text-sm">
-                        {donor.customer_name || 'Hamba Allah'}
+                        {donor.is_anonymous ? 'Hamba Allah' : (donor.customer_name || 'Hamba Allah')}
                       </p>
                       <p className="text-sm text-gray-600">
                         Berdonasi sebesar <span className="font-semibold text-gray-900">{formatCurrency(donor.amount)}</span>

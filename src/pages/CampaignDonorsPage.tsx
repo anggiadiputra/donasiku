@@ -82,7 +82,7 @@ export default function CampaignDonorsPage() {
     };
 
     const filteredDonors = donors.filter(donor => {
-        const name = donor.customer_name || 'Hamba Allah';
+        const name = donor.is_anonymous ? 'Hamba Allah' : (donor.customer_name || 'Hamba Allah');
         return name.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
@@ -146,7 +146,7 @@ export default function CampaignDonorsPage() {
                         {filteredDonors.map((donor) => (
                             <div key={donor.id} className="flex gap-4 p-3 bg-white rounded-xl shadow-sm border border-gray-100">
                                 <div className="w-10 h-10 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
-                                    {!donor.customer_name ? (
+                                    {donor.is_anonymous || !donor.customer_name ? (
                                         <div className="w-5 h-5 bg-gray-200 rounded-full" />
                                     ) : (
                                         <span className="font-bold text-gray-500 text-sm">
@@ -156,7 +156,7 @@ export default function CampaignDonorsPage() {
                                 </div>
                                 <div className="flex-1">
                                     <p className="font-bold text-gray-800 text-sm">
-                                        {donor.customer_name || 'Hamba Allah'}
+                                        {donor.is_anonymous ? 'Hamba Allah' : (donor.customer_name || 'Hamba Allah')}
                                     </p>
                                     <p className="text-sm text-gray-600">
                                         Berdonasi sebesar <span className="font-semibold text-gray-900">{formatCurrency(donor.amount)}</span>
