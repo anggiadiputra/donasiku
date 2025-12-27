@@ -160,7 +160,7 @@ export default function DonationForm() {
 
   const messagePlaceholder = (location.state as any)?.messagePlaceholder || "Tuliskan pesan atau doa disini (optional)";
   const messageRequired = (location.state as any)?.messageRequired || false;
-  const emailRequired = (location.state as any)?.emailRequired || false;
+
 
   if (isLoading) {
     return (
@@ -264,7 +264,7 @@ export default function DonationForm() {
       return;
     }
 
-    if (emailRequired && !email) {
+    if (!email) {
       toast.error('Silakan isi alamat email');
       return;
     }
@@ -591,8 +591,8 @@ export default function DonationForm() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={emailRequired ? "Email" : "Email (optional)"}
-                required={emailRequired}
+                placeholder="Email"
+                required
                 disabled={isProcessing}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none mb-4 disabled:opacity-50"
                 style={{ '--focus-border': primaryColor } as React.CSSProperties}
