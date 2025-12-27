@@ -446,6 +446,8 @@ export default function InfaqPage() {
                       customAmount: amountNum,
                       paymentType: 'infaq',
                       messagePlaceholder: "Sampaikan niat berinfak",
+                      messageRequired: true,
+                      emailRequired: true,
                       // Pass any other necessary info
                     }
                   });

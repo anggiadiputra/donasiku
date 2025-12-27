@@ -159,6 +159,8 @@ export default function DonationForm() {
   }, [location.state]);
 
   const messagePlaceholder = (location.state as any)?.messagePlaceholder || "Tuliskan pesan atau doa disini (optional)";
+  const messageRequired = (location.state as any)?.messageRequired || false;
+  const emailRequired = (location.state as any)?.emailRequired || false;
 
   if (isLoading) {
     return (
@@ -257,6 +259,16 @@ export default function DonationForm() {
       return;
     }
 
+    if (messageRequired && !message) {
+      toast.error('Silakan isi niat berinfak');
+      return;
+    }
+
+    if (emailRequired && !email) {
+      toast.error('Silakan isi alamat email');
+      return;
+    }
+
     // New validation: If campaignId is missing (e.g. invalid slug), validation fails
     if (!displayCampaign.id) {
       toast.error('Campaign tidak ditemukan. Silakan refresh halaman.');
@@ -307,7 +319,7 @@ export default function DonationForm() {
       const { data: transaction, error: transactionError } = await supabase.functions.invoke('create-duitku-transaction', {
         body: {
           campaignId: finalCampaignId,
-          campaignSlug: finalCampaignSlug, // Pass slug
+          campaignSlug: finalCampaignSlug || '', // Pass slug or empty string if undefined
           amount: amount,
           paymentMethod: paymentMethod,
           customerName: hideName ? anonymousName : fullName,
@@ -579,7 +591,8 @@ export default function DonationForm() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email (optional)"
+                placeholder={emailRequired ? "Email" : "Email (optional)"}
+                required={emailRequired}
                 disabled={isProcessing}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none mb-4 disabled:opacity-50"
                 style={{ '--focus-border': primaryColor } as React.CSSProperties}
@@ -592,6 +605,7 @@ export default function DonationForm() {
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder={messagePlaceholder}
                 rows={4}
+                required={messageRequired}
                 disabled={isProcessing}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none resize-none disabled:opacity-50"
                 style={{ '--focus-border': primaryColor } as React.CSSProperties}
