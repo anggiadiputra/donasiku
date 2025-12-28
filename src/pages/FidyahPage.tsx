@@ -123,7 +123,7 @@ export default function FidyahPage() {
                     id: tx.id,
                     donor_name: tx.customer_name,
                     amount: tx.amount,
-                    is_anonymous: tx.customer_name === 'Orang Baik',
+                    is_anonymous: tx.is_anonymous || tx.metadata?.is_anonymous,
                     created_at: tx.created_at,
                     campaign_id: tx.campaign_id,
                     payment_method: tx.payment_method,

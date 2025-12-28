@@ -156,7 +156,7 @@ export default function CampaignDonorsPage() {
                                 </div>
                                 <div className="flex-1">
                                     <p className="font-bold text-gray-800 text-sm">
-                                        {donor.is_anonymous ? 'Hamba Allah' : (donor.customer_name || 'Hamba Allah')}
+                                        {(donor.is_anonymous || donor.metadata?.is_anonymous) ? 'Orang Baik' : (donor.customer_name || 'Hamba Allah')}
                                     </p>
                                     <p className="text-sm text-gray-600">
                                         Berdonasi sebesar <span className="font-semibold text-gray-900">{formatCurrency(donor.amount)}</span>

@@ -211,7 +211,8 @@ serve(async (req) => {
                 minimumFractionDigits: 0
             }).format(transaction.amount);
 
-            const donorName = transaction.customer_name || 'Hamba Allah';
+            const isAnonymous = transaction.is_anonymous;
+            const donorName = isAnonymous ? 'Orang Baik' : (transaction.customer_name || 'Hamba Allah');
             let campaignTitle = transaction.campaigns?.title || 'Program Kebaikan';
 
             // Override campaign title based on product details for Fidyah/Infaq

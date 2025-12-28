@@ -315,6 +315,7 @@ serve(async (req) => {
         return_url: finalReturnUrl,
         expiry_time: expiryTime.toISOString(),
         item_details: duitkuPayload.itemDetails,
+        is_anonymous: isAnonymous, // Save anonymous flag
         metadata: metadata, // Save metadata
       })
       .select()

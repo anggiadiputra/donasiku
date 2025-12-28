@@ -60,7 +60,7 @@ export default function CampaignPrayersPage() {
             // 2. Fetch Transactions (Messages)
             const { data: txData, error: txError } = await supabase
                 .from('transactions')
-                .select('id, customer_name, customer_message, created_at, amen_count')
+                .select('id, customer_name, customer_message, created_at, amen_count, is_anonymous, metadata')
                 .eq('campaign_id', campaign.id)
                 .eq('status', 'success')
                 .not('customer_message', 'is', null)
@@ -79,7 +79,7 @@ export default function CampaignPrayersPage() {
             // Combine and map
             const txMessages = (txData || []).map(tx => ({
                 id: tx.id,
-                donor_name: tx.customer_name || 'Hamba Allah',
+                donor_name: (tx.is_anonymous || tx.metadata?.is_anonymous) ? 'Orang Baik' : (tx.customer_name || 'Hamba Allah'),
                 message: tx.customer_message,
                 amen_count: tx.amen_count || 0,
                 source_type: 'transaction',
