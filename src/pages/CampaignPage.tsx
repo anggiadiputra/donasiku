@@ -93,6 +93,20 @@ export default function CampaignPage() {
         }
 
         if (shouldShow) {
+          // Fetch profile to get latest organization name
+          if (data.user_id) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('organization_name, avatar_url')
+              .eq('id', data.user_id)
+              .single();
+
+            if (profile) {
+              data.organization_name = profile.organization_name || data.organization_name;
+              // data.organization_logo = profile.avatar_url || data.organization_logo; // Optional: sync logo too if needed
+            }
+          }
+
           setCampaign(data);
           setRealtimeStats({
             amount: data.current_amount,
