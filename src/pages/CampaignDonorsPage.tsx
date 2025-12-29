@@ -4,6 +4,7 @@ import { ArrowLeft, Search, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { CampaignDonorsSkeleton } from '../components/SkeletonLoader';
+import { isNetworkError } from '../utils/errorHandling';
 
 // Utility functions (mirrored from utils/format usually, or inline if simple)
 const formatCurrency = (amount: number) => {
@@ -49,7 +50,7 @@ export default function CampaignDonorsPage() {
         }
     }, [slug]);
 
-    const fetchData = async () => {
+    const fetchData = async (retryCount = 0) => {
         try {
             setLoading(true);
 
@@ -60,7 +61,16 @@ export default function CampaignDonorsPage() {
                 .eq('slug', slug)
                 .single();
 
-            if (campaignError || !campaign) throw new Error('Campaign not found');
+            if (campaignError) {
+                if (isNetworkError(campaignError) && retryCount < 2) {
+                    console.warn(`Campaign lookup network issue, retrying (${retryCount + 1})...`);
+                    setTimeout(() => fetchData(retryCount + 1), 2000);
+                    return;
+                }
+                throw new Error('Campaign not found');
+            }
+
+            if (!campaign) throw new Error('Campaign not found');
             setCampaignTitle(campaign.title);
 
             // 2. Fetch Donors
@@ -71,13 +81,26 @@ export default function CampaignDonorsPage() {
                 .eq('status', 'success')
                 .order('created_at', { ascending: false });
 
-            if (donorsError) throw donorsError;
+            if (donorsError) {
+                if (isNetworkError(donorsError) && retryCount < 2) {
+                    console.warn(`Donors fetch network issue, retrying (${retryCount + 1})...`);
+                    setTimeout(() => fetchData(retryCount + 1), 2000);
+                    return;
+                }
+                throw donorsError;
+            }
             setDonors(donorsData || []);
 
-        } catch (error) {
-            console.error('Error fetching donors:', error);
+        } catch (err: any) {
+            console.error('Error fetching data in DonorsPage:', err);
+            if (isNetworkError(err) && retryCount < 2) {
+                setTimeout(() => fetchData(retryCount + 1), 2000);
+                return;
+            }
         } finally {
-            setLoading(false);
+            if (retryCount === 0 || !loading) {
+                setLoading(false);
+            }
         }
     };
 

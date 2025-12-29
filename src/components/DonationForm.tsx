@@ -6,6 +6,7 @@ import { supabase, Campaign } from '../lib/supabase';
 import { findCampaignBySlug } from '../utils/slug';
 import PaymentMethodSelector from './PaymentMethodSelector';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
+import { isNetworkError } from '../utils/errorHandling';
 
 export default function DonationForm() {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ export default function DonationForm() {
     }
   }, [slug, location.state]);
 
-  const fetchCampaignFromSlug = async (campaignSlug: string) => {
+  const fetchCampaignFromSlug = async (campaignSlug: string, retryCount = 0) => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
@@ -40,7 +41,14 @@ export default function DonationForm() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching campaign:', error);
+        console.error('Error fetching campaign in Form:', error);
+
+        // Handle Network Errors
+        if (isNetworkError(error) && retryCount < 2) {
+          console.warn(`Form network issue, retrying (${retryCount + 1})...`);
+          setTimeout(() => fetchCampaignFromSlug(campaignSlug, retryCount + 1), 2000);
+          return;
+        }
         return;
       }
 
@@ -53,10 +61,16 @@ export default function DonationForm() {
           setCampaign(data[0]);
         }
       }
-    } catch (error) {
-      console.error('Error:', error);
+    } catch (err: any) {
+      console.error('Unexpected Form error:', err);
+      if (isNetworkError(err) && retryCount < 2) {
+        setTimeout(() => fetchCampaignFromSlug(campaignSlug, retryCount + 1), 2000);
+        return;
+      }
     } finally {
-      setIsLoading(false);
+      if (retryCount === 0 || !isLoading) {
+        setIsLoading(false);
+      }
     }
   };
 

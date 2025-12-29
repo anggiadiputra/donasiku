@@ -5,6 +5,9 @@ import { supabase, Campaign } from '../lib/supabase';
 import { createSlug } from '../utils/slug';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 
+import { isNetworkError, isDatabaseRelationshipError } from '../utils/errorHandling';
+import { CampaignSliderSkeleton } from './SkeletonLoader';
+
 interface CampaignSliderProps {
     variant?: 'primary' | 'secondary';
 }
@@ -20,16 +23,22 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
         fetchData();
     }, [variant]); // Refetch if variant changes
 
-    const fetchData = async () => {
+    const fetchData = async (retryCount = 0) => {
         try {
             setLoading(true);
 
             // 1. Fetch Settings
-            const { data: settings } = await supabase
+            const { data: settings, error: settingsError } = await supabase
                 .from('layout_settings')
-                .select('*') // Fetch all to be safe, or specify all column names
+                .select('*')
                 .limit(1)
                 .maybeSingle();
+
+            if (settingsError && isNetworkError(settingsError) && retryCount < 2) {
+                console.warn(`Network issue in settings, retrying (${retryCount + 1})...`);
+                setTimeout(() => fetchData(retryCount + 1), 2000);
+                return;
+            }
 
             if (settings) {
                 let enabled, title, ids;
@@ -39,7 +48,6 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                     title = settings.campaign_slider_2_title;
                     ids = settings.campaign_slider_2_ids;
                 } else {
-                    // Default to primary
                     enabled = settings.campaign_slider_enabled;
                     title = settings.campaign_slider_title;
                     ids = settings.campaign_slider_ids;
@@ -62,24 +70,19 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                     .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 
                 if (ids && Array.isArray(ids) && ids.length > 0) {
-                    // Filter for valid UUIDs to prevent 400 Bad Request
                     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
                     const validIds = ids.filter(id => id && typeof id === 'string' && uuidRegex.test(id));
 
                     if (validIds.length === 0) {
-                        // Fallback if all IDs are invalid
                         const { data, error } = await query
                             .order('created_at', { ascending: false })
                             .limit(10);
                         if (error) throw error;
                         if (data) setCampaigns(data);
                     } else {
-                        // Fetch specific campaigns
                         const { data, error } = await query.in('id', validIds);
-
                         if (error) throw error;
                         if (data) {
-                            // Sort by the order in ids
                             const sortedData = ids
                                 .map(id => data.find(c => c.id === id))
                                 .filter(c => c !== undefined) as Campaign[];
@@ -87,17 +90,14 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                         }
                     }
                 } else {
-                    // Default: Top 10 recent
                     const { data, error } = await query
                         .order('created_at', { ascending: false })
                         .limit(10);
-
                     if (error) throw error;
                     if (data) setCampaigns(data);
                 }
 
             } else {
-                // Fallback if no settings
                 const { data, error } = await supabase
                     .from('campaigns')
                     .select('*, profiles:user_id(full_name, organization_name, avatar_url)')
@@ -109,10 +109,15 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
             }
 
         } catch (error: any) {
-            console.error('Error:', error);
+            console.error('Slider fetchData error:', error);
 
-            // Fallback for missing relationship or permissions
-            if (error.code === '42501' || error.code === 'PGRST200' || error?.message?.includes('relationship')) {
+            if (isNetworkError(error) && retryCount < 2) {
+                console.warn(`Network issue in data, retrying (${retryCount + 1})...`);
+                setTimeout(() => fetchData(retryCount + 1), 2000);
+                return;
+            }
+
+            if (isDatabaseRelationshipError(error) || isNetworkError(error)) {
                 console.warn('Falling back to basic query in Slider...');
                 const { data: fallbackData } = await supabase
                     .from('campaigns')
@@ -130,7 +135,9 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
 
             setCampaigns([]);
         } finally {
-            setLoading(false);
+            if (retryCount === 0 || !loading) {
+                setLoading(false);
+            }
         }
     };
 
@@ -144,18 +151,7 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
     };
 
     if (loading) {
-        return (
-            <div className="py-6 bg-white border-b border-gray-100">
-                <div className="w-full max-w-[480px] mx-auto px-4">
-                    <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-4"></div>
-                    <div className="flex gap-4 overflow-hidden">
-                        {[1, 2].map(i => (
-                            <div key={i} className="w-[280px] shrink-0 bg-gray-100 rounded-xl h-[320px] animate-pulse"></div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        );
+        return <CampaignSliderSkeleton />;
     }
 
     if (campaigns.length === 0) return null;

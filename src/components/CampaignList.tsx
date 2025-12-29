@@ -5,6 +5,7 @@ import { supabase, Campaign } from '../lib/supabase';
 import CampaignCard from './CampaignCard';
 import { createSlug } from '../utils/slug';
 import { CampaignListSkeleton } from './SkeletonLoader';
+import { isNetworkError, isDatabaseRelationshipError } from '../utils/errorHandling';
 
 interface CampaignListProps {
   onCampaignClick?: (campaign: Campaign) => void;
@@ -19,11 +20,10 @@ export default function CampaignList({ onCampaignClick }: CampaignListProps) {
     fetchCampaigns();
   }, []);
 
-  const fetchCampaigns = async () => {
+  const fetchCampaigns = async (retryCount = 0) => {
     try {
       setLoading(true);
 
-      // First, let's check if we can access campaigns at all
       const { data, error } = await supabase
         .from('campaigns')
         .select('*, profiles:user_id(full_name, organization_name, avatar_url)')
@@ -33,19 +33,19 @@ export default function CampaignList({ onCampaignClick }: CampaignListProps) {
         .limit(10);
 
       if (error) {
-        console.error('Error fetching campaigns:', error);
-        console.error('Error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
+        console.error('Campaign fetching error:', error);
 
-        // If RLS policy issue or Relationship issue, try alternative query
-        if (error.code === '42501' || error.code === 'PGRST200' || error.message.includes('permission') || error.message.includes('policy') || error.message.includes('relationship')) {
-          console.warn('Data fetching issue detected. Trying basic fallback query...');
+        // 1. Handle Network Errors with limited retry
+        if (isNetworkError(error) && retryCount < 2) {
+          console.warn(`Network issue, retrying (${retryCount + 1})...`);
+          setTimeout(() => fetchCampaigns(retryCount + 1), 2000);
+          return;
+        }
 
-          // Try to fetch all campaigns without join (fallback)
+        // 2. Handle Relationship/Permission Errors with Fallback
+        if (isDatabaseRelationshipError(error) || isNetworkError(error)) {
+          console.warn('Attempting fallback query due to fetching issue...');
+
           const { data: allData, error: allError } = await supabase
             .from('campaigns')
             .select('*')
@@ -53,29 +53,27 @@ export default function CampaignList({ onCampaignClick }: CampaignListProps) {
             .limit(10);
 
           if (!allError && allData) {
-            // Filter published campaigns on client side
-            const publishedCampaigns = allData.filter(c => c.status === 'published');
-
-            setCampaigns(publishedCampaigns);
+            setCampaigns(allData.filter(c => c.status === 'published' && !["infaq", "fidyah", "zakat", "wakaf", "sedekah-subuh", "kemanusiaan"].includes(c.slug || '')));
             return;
           }
         }
 
-        // If table doesn't exist, show empty state gracefully
-        if (error.code === 'PGRST116' || error.message.includes('relation')) {
-          console.warn('Campaigns table may not exist');
-        }
         setCampaigns([]);
       } else {
-
-
         setCampaigns(data || []);
       }
-    } catch (error) {
-      console.error('Error:', error);
+    } catch (err: any) {
+      console.error('Unexpected error:', err);
+      // Handle generic fetch/TypeError
+      if (isNetworkError(err) && retryCount < 2) {
+        setTimeout(() => fetchCampaigns(retryCount + 1), 2000);
+        return;
+      }
       setCampaigns([]);
     } finally {
-      setLoading(false);
+      if (retryCount === 0 || !loading) {
+        setLoading(false);
+      }
     }
   };
 

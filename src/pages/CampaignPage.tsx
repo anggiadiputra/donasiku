@@ -10,6 +10,7 @@ import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { CampaignPageSkeleton } from '../components/SkeletonLoader';
 import { useAppName } from '../hooks/useAppName';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { isNetworkError, isDatabaseRelationshipError } from '../utils/errorHandling';
 
 export default function CampaignPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -25,9 +26,6 @@ export default function CampaignPage() {
   const [donors, setDonors] = useState<any[]>([]);
   const [realtimeStats, setRealtimeStats] = useState({ amount: 0, count: 0 });
   const [showShareModal, setShowShareModal] = useState(false);
-
-
-
 
   // Calculate hover color (darker)
   const getHoverColor = (color: string) => {
@@ -50,7 +48,7 @@ export default function CampaignPage() {
         'infaq': '/infaq',
         'fidyah': '/fidyah',
         'zakat': '/zakat',
-        'wakaf': '/wakaf', // Assuming /wakaf exists, if not, remove or handle. Safe to assume dedicated pages exist or will exist for these main types.
+        'wakaf': '/wakaf',
         'sedekah-subuh': '/sedekah-subuh'
       };
 
@@ -63,21 +61,26 @@ export default function CampaignPage() {
     }
   }, [slug]);
 
-
-
-  const fetchCampaign = async (campaignSlug: string) => {
+  const fetchCampaign = async (campaignSlug: string, retryCount = 0) => {
     try {
       setLoading(true);
-      // Fetch specific campaign by slug directly (Optimized)
       const { data, error } = await supabase
         .from('campaigns')
         .select('*')
         .eq('slug', campaignSlug)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching campaign:', error);
-        setLoading(false);
+      if (error) {
+        if (isNetworkError(error) && retryCount < 2) {
+          console.warn(`Campaign detail network issue, retrying (${retryCount + 1})...`);
+          setTimeout(() => fetchCampaign(campaignSlug, retryCount + 1), 2000);
+          return;
+        }
+
+        if (error.code !== 'PGRST116') {
+          console.error('Error fetching campaign:', error);
+        }
+        setCampaign(null);
         return;
       }
 
@@ -103,7 +106,6 @@ export default function CampaignPage() {
 
             if (profile) {
               data.organization_name = profile.organization_name || data.organization_name;
-              // data.organization_logo = profile.avatar_url || data.organization_logo; // Optional: sync logo too if needed
             }
           }
 
@@ -115,16 +117,23 @@ export default function CampaignPage() {
           fetchCampaignTransactions(data.id);
         }
       }
-    } catch (error) {
-      console.error('Error:', error);
+    } catch (err: any) {
+      console.error('Unexpected Detail error:', err);
+      if (isNetworkError(err) && retryCount < 2) {
+        setTimeout(() => fetchCampaign(campaignSlug, retryCount + 1), 2000);
+        return;
+      }
+      setCampaign(null);
     } finally {
-      setLoading(false);
+      if (retryCount === 0 || !loading) {
+        setLoading(false);
+      }
     }
   };
 
-  const fetchCampaignTransactions = async (campaignId: string) => {
+  const fetchCampaignTransactions = async (campaignId: string, retryCount = 0) => {
     try {
-      // 1. Fetch ALL success transactions for statistics and donor list
+      // 1. Fetch ALL success transactions
       const { data: transactionsData, error: transactionsError } = await supabase
         .from('transactions')
         .select('id, customer_name, customer_message, created_at, amount, amen_count, is_anonymous, metadata')
@@ -132,7 +141,13 @@ export default function CampaignPage() {
         .eq('status', 'success')
         .order('created_at', { ascending: false });
 
-      if (transactionsError) console.error('Error fetching transactions:', transactionsError);
+      if (transactionsError) {
+        if (isNetworkError(transactionsError) && retryCount < 2) {
+          setTimeout(() => fetchCampaignTransactions(campaignId, retryCount + 1), 2000);
+          return;
+        }
+        console.error('Error fetching transactions:', transactionsError);
+      }
 
       const validTransactions = transactionsData || [];
 
@@ -145,17 +160,13 @@ export default function CampaignPage() {
       setDonors(validTransactions);
 
       // 2. Fetch Manual Testimonials
-      const { data: testimonialsData, error: testimonialsError } = await supabase
+      const { data: testimonialsData } = await supabase
         .from('testimonials')
         .select('*')
         .eq('campaign_id', campaignId)
         .order('created_at', { ascending: false });
 
-      if (testimonialsError && testimonialsError.code !== 'PGRST116') {
-        console.error('Error fetching manual testimonials:', testimonialsError);
-      }
-
-      // 3. Prepare Prayers List (Transactions with messages + Manual Testimonials)
+      // 3. Prepare Prayers List
       const transactionMessages: Testimonial[] = validTransactions
         .filter(t => t.customer_message && t.customer_message.trim().length > 0)
         .map(tx => ({

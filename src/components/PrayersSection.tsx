@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { darkenColor } from '../utils/colorUtils';
 import { useNavigate } from 'react-router-dom';
+import { isNetworkError } from '../utils/errorHandling';
 
 interface Prayer {
     id: string;
@@ -69,7 +70,7 @@ export default function PrayersSection() {
         }
     };
 
-    const fetchPrayers = async () => {
+    const fetchPrayers = async (retryCount = 0) => {
         try {
             setLoading(true);
 
@@ -83,7 +84,18 @@ export default function PrayersSection() {
                 .order('created_at', { ascending: false })
                 .limit(7);
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error fetching prayers:', error);
+
+                // Handle Network Errors
+                if (isNetworkError(error) && retryCount < 2) {
+                    console.warn(`Prayers network issue, retrying (${retryCount + 1})...`);
+                    setTimeout(() => fetchPrayers(retryCount + 1), 2000);
+                    return;
+                }
+                setPrayers([]);
+                return;
+            }
 
             // Fetch campaign titles
             if (transactions && transactions.length > 0) {
@@ -122,10 +134,17 @@ export default function PrayersSection() {
             } else {
                 setPrayers([]);
             }
-        } catch (error) {
-            console.error('Error fetching prayers:', error);
+        } catch (err: any) {
+            console.error('Unexpected Prayers error:', err);
+            if (isNetworkError(err) && retryCount < 2) {
+                setTimeout(() => fetchPrayers(retryCount + 1), 2000);
+                return;
+            }
+            setPrayers([]);
         } finally {
-            setLoading(false);
+            if (retryCount === 0 || !loading) {
+                setLoading(false);
+            }
         }
     };
 

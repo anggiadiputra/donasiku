@@ -19,6 +19,7 @@ import { DashboardContentSkeleton } from '../components/SkeletonLoader';
 import DashboardLayout from '../components/DashboardLayout';
 
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
+import { isNetworkError } from '../utils/errorHandling';
 
 export default function DashboardPage() {
   usePageTitle('Dashboard');
@@ -48,15 +49,29 @@ export default function DashboardPage() {
     fetchUserProfile();
   }, [timeframe]);
 
-  const fetchUserProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
-      setUserProfile({ ...user, ...data });
+  const fetchUserProfile = async (retryCount = 0) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+
+        if (error) {
+          if (isNetworkError(error) && retryCount < 2) {
+            setTimeout(() => fetchUserProfile(retryCount + 1), 2000);
+            return;
+          }
+        }
+
+        setUserProfile({ ...user, ...data });
+      }
+    } catch (err: any) {
+      if (isNetworkError(err) && retryCount < 2) {
+        setTimeout(() => fetchUserProfile(retryCount + 1), 2000);
+      }
     }
   };
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = async (retryCount = 0) => {
     try {
       setLoading(true);
 
@@ -80,25 +95,41 @@ export default function DashboardPage() {
         .eq('status', 'success')
         .gte('created_at', startDate.toISOString());
 
-      if (txError) throw txError;
+      if (txError) {
+        if (isNetworkError(txError) && retryCount < 2) {
+          console.warn(`Analytics fetch network issue, retrying (${retryCount + 1})...`);
+          setTimeout(() => fetchAnalytics(retryCount + 1), 2000);
+          return;
+        }
+        throw txError;
+      }
       if (!periodTx) periodTx = [];
 
       // 1b. Fetch All Transactions Count (in period)
-      const { count: totalTxPeriodCount } = await supabase
+      const { count: totalTxPeriodCount, error: countError } = await supabase
         .from('transactions')
         .select('*', { count: 'exact', head: true })
         .gte('created_at', startDate.toISOString());
 
+      if (countError) {
+        // Not critical enough to fail entire thing if txError passed
+        console.warn('Count fetch error:', countError);
+      }
+
       // 3. Fetch Recent Transactions (Always latest 10, regardless of filter for the list view)
-      // OR should the list also be filtered? Usually "Recent Transactions" implies absolute latest.
-      // Let's keep it as absolute latest for now, or match specific request if needed.
       const { data: recent, error: recentError } = await supabase
         .from('transactions')
         .select('id, amount, status, customer_name, created_at, invoice_code, campaigns(title)')
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (recentError) throw recentError;
+      if (recentError) {
+        if (isNetworkError(recentError) && retryCount < 2) {
+          setTimeout(() => fetchAnalytics(retryCount + 1), 2000);
+          return;
+        }
+        throw recentError;
+      }
 
       // --- Calculations ---
 
@@ -189,10 +220,16 @@ export default function DashboardPage() {
       setTrendData(chartData);
       setRecentTransactions(recent || []);
 
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
+    } catch (err: any) {
+      console.error('Error fetching analytics:', err);
+      if (isNetworkError(err) && retryCount < 2) {
+        setTimeout(() => fetchAnalytics(retryCount + 1), 2000);
+        return;
+      }
     } finally {
-      setLoading(false);
+      if (retryCount === 0 || !loading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -431,7 +468,7 @@ export default function DashboardPage() {
                   <Tooltip
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     cursor={{ fill: '#F9FAFB' }}
-                    formatter={(value: number) => [formatCurrency(value), 'Donasi']}
+                    formatter={(value: any) => [formatCurrency(value as number), 'Donasi']}
                   />
                   <Bar
                     dataKey="value"

@@ -28,8 +28,8 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
-  useSensor,
   useSensors,
+  useSensor,
   DragEndEvent,
 } from '@dnd-kit/core';
 import {
@@ -46,6 +46,8 @@ import { uploadToS3ViaAPI } from '../utils/s3Storage';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { SettingsPageSkeleton } from '../components/SkeletonLoader';
+import { isNetworkError } from '../utils/errorHandling';
+
 // Card Save Button Component
 interface CardSaveButtonProps {
   isSaving: boolean;
@@ -293,7 +295,9 @@ export default function SettingsPage() {
     applyFontSettings(fontSettings);
     // alert('Pengaturan font disimpan!'); // Removed alert for cleaner UX, or keep it? LayoutSettings uses alert.
     // LayoutSettings used proper saving. I'll keep alert but after loading.
-    toast.success('Pengaturan font berhasil disimpan!');
+    toast.success('Pengaturan font disimpan', {
+      description: `Font ${fontSettings.fontFamily} dengan ukuran ${fontSettings.fontSize}px telah diterapkan.`
+    });
     setSavingSection(null);
   };
 
@@ -318,7 +322,7 @@ export default function SettingsPage() {
       .toString(16).slice(1);
   };
 
-  const fetchSettings = async () => {
+  const fetchSettings = async (retryCount = 0) => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -329,6 +333,13 @@ export default function SettingsPage() {
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching settings:', error);
+
+        // Handle Network Errors
+        if (isNetworkError(error) && retryCount < 2) {
+          console.warn(`Settings fetch network issue, retrying (${retryCount + 1})...`);
+          setTimeout(() => fetchSettings(retryCount + 1), 2000);
+          return;
+        }
       }
 
       if (data) {
@@ -343,29 +354,42 @@ export default function SettingsPage() {
           applyPrimaryColor(data.primary_color);
         }
       }
-    } catch (error) {
-      console.error('Error:', error);
+    } catch (err: any) {
+      console.error('Unexpected Settings error:', err);
+      if (isNetworkError(err) && retryCount < 2) {
+        setTimeout(() => fetchSettings(retryCount + 1), 2000);
+        return;
+      }
     } finally {
-      setLoading(false);
+      if (retryCount === 0 || !loading) {
+        setLoading(false);
+      }
     }
   };
 
-  const fetchPaymentMethods = async () => {
+  const fetchPaymentMethods = async (retryCount = 0) => {
     try {
       const { data, error } = await supabase
         .from('payment_methods')
         .select('*')
-        // .order('category', { ascending: true }) // Removed to respect manual sort_order
         .order('sort_order', { ascending: true });
 
       if (error) {
         console.error('Error fetching payment methods:', error);
+        if (isNetworkError(error) && retryCount < 2) {
+          setTimeout(() => fetchPaymentMethods(retryCount + 1), 2000);
+          return;
+        }
         return;
       }
 
       setPaymentMethods(data || []);
-    } catch (error) {
-      console.error('Error:', error);
+    } catch (err: any) {
+      console.error('Unexpected Payment Methods error:', err);
+      if (isNetworkError(err) && retryCount < 2) {
+        setTimeout(() => fetchPaymentMethods(retryCount + 1), 2000);
+        return;
+      }
     }
   };
 
@@ -595,7 +619,9 @@ export default function SettingsPage() {
         localStorage.setItem('primaryColor', settings.primary_color);
       }
 
-      toast.success('Pengaturan berhasil disimpan!');
+      toast.success('Pengaturan disimpan', {
+        description: 'Seluruh konfigurasi aplikasi Anda telah berhasil diperbarui.'
+      });
     } catch (error: any) {
       console.error('Error saving settings:', error);
       toast.error('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));

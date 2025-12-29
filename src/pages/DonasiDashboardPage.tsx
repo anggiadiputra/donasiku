@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DollarSign, TrendingUp, Heart, Search, Eye, Trash2, Bell, LogOut, Menu, MessageCircle, Printer } from 'lucide-react';
+import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
 import { useAppName } from '../hooks/useAppName';
@@ -462,8 +463,8 @@ export default function DonasiDashboardPage() {
                                                             onClick={() => tx.status === 'pending' && handleFollowUp(tx)}
                                                             disabled={tx.status !== 'pending'}
                                                             className={`flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm transition-colors ${tx.status === 'pending'
-                                                                    ? 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100 cursor-pointer'
-                                                                    : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-70'
+                                                                ? 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100 cursor-pointer'
+                                                                : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-70'
                                                                 }`}
                                                             title={tx.status === 'pending' ? "Follow up via WhatsApp" : "Follow up disabled"}
                                                         >
@@ -486,7 +487,9 @@ export default function DonasiDashboardPage() {
                                                                     if (tx.payment_url) {
                                                                         window.open(tx.payment_url, '_blank');
                                                                     } else {
-                                                                        alert('Payment URL tidak tersedia');
+                                                                        toast.error('Invoice tidak tersedia', {
+                                                                            description: 'URL pembayaran untuk transaksi ini tidak ditemukan'
+                                                                        });
                                                                     }
                                                                 }}
                                                                 className="px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-600 rounded hover:bg-blue-50 transition-colors flex items-center gap-1"

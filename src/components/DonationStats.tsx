@@ -4,10 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { HeartHandshake, MessageCircle } from 'lucide-react';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { supabase } from '../lib/supabase';
+import { SkeletonBox } from './SkeletonLoader';
 
 export default function DonationStats() {
   const navigate = useNavigate();
   const primaryColor = usePrimaryColor();
+  const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState({
     primaryLabel: 'Donasi Sekarang',
     primaryLink: '/donasi',
@@ -21,6 +23,7 @@ export default function DonationStats() {
 
   const fetchSettings = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('layout_settings')
         .select('cta_primary_label, cta_primary_link, cta_secondary_label, cta_secondary_link')
@@ -36,6 +39,8 @@ export default function DonationStats() {
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -46,6 +51,23 @@ export default function DonationStats() {
       navigate(link);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="bg-gray-50 py-8">
+        <div className="w-full max-w-[480px] mx-auto px-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
+            <SkeletonBox className="h-6 w-48 mx-auto mb-4" />
+            <SkeletonBox className="h-4 w-64 mx-auto mb-6" />
+            <div className="flex flex-col sm:flex-row justify-center gap-3">
+              <SkeletonBox className="h-12 w-40 rounded-full" />
+              <SkeletonBox className="h-12 w-40 rounded-full" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-50 py-8">

@@ -72,7 +72,9 @@ export default function AddNewCampaignPage() {
 
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
-      alert('Nama kategori tidak boleh kosong');
+      toast.error('Gagal menambahkan kategori', {
+        description: 'Nama kategori tidak boleh kosong'
+      });
       return;
     }
 
@@ -92,9 +94,13 @@ export default function AddNewCampaignPage() {
 
       if (error) {
         if (error.code === '23505') { // Unique constraint violation
-          alert('Kategori dengan nama ini sudah ada');
+          toast.error('Kategori sudah ada', {
+            description: 'Kategori dengan nama ini sudah terdaftar'
+          });
         } else {
-          alert('Gagal menambahkan kategori: ' + error.message);
+          toast.error('Gagal menambahkan kategori', {
+            description: error.message
+          });
         }
         return;
       }
@@ -104,11 +110,15 @@ export default function AddNewCampaignPage() {
         setCategoryId(data.id);
         setNewCategoryName('');
         setShowAddCategory(false);
-        alert('Kategori berhasil ditambahkan!');
+        toast.success('Kategori ditambahkan', {
+          description: `Kategori "${data.name}" berhasil dibuat`
+        });
       }
     } catch (error: any) {
       console.error('Error adding category:', error);
-      alert('Terjadi kesalahan saat menambahkan kategori');
+      toast.error('Terjadi kesalahan', {
+        description: 'Gagal menambahkan kategori karena kesalahan sistem'
+      });
     }
   };
 
@@ -257,9 +267,16 @@ export default function AddNewCampaignPage() {
         .insert([campaignData]);
 
       if (error) {
-        toast.error('Gagal menyimpan campaign: ' + error.message);
+        toast.error('Gagal menyimpan campaign', {
+          description: error.message
+        });
       } else {
-        toast.success(publish ? 'Campaign berhasil dipublish!' : 'Campaign berhasil disimpan sebagai draft!');
+        toast.success(publish ? 'Campaign Berhasil Dipublish!' : 'Campaign Disimpan sebagai Draft', {
+          description: publish
+            ? 'Campaign Anda sekarang dapat dilihat oleh publik.'
+            : 'Draft campaign Anda telah berhasil diperbarui.',
+          duration: 5000,
+        });
         navigate('/donasi/campaigns'); // Create separate page for list management later
       }
     } catch (error) {

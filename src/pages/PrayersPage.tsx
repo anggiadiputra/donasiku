@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { isNetworkError } from '../utils/errorHandling';
 
 interface Prayer {
     id: string;
@@ -77,7 +78,7 @@ export default function PrayersPage() {
         }
     };
 
-    const fetchCampaigns = async () => {
+    const fetchCampaigns = async (retryCount = 0) => {
         try {
             const { data, error } = await supabase
                 .from('campaigns')
@@ -85,14 +86,20 @@ export default function PrayersPage() {
                 .eq('status', 'published')
                 .order('title');
 
-            if (error) throw error;
+            if (error) {
+                if (isNetworkError(error) && retryCount < 2) {
+                    setTimeout(() => fetchCampaigns(retryCount + 1), 2000);
+                    return;
+                }
+                throw error;
+            }
             setCampaigns(data || []);
         } catch (error) {
             console.error('Error fetching campaigns:', error);
         }
     };
 
-    const fetchPrayers = async () => {
+    const fetchPrayers = async (retryCount = 0) => {
         try {
             setLoading(true);
 
@@ -104,7 +111,14 @@ export default function PrayersPage() {
                 .neq('customer_message', '')
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (error) {
+                if (isNetworkError(error) && retryCount < 2) {
+                    console.warn(`PrayersPage network issue, retrying (${retryCount + 1})...`);
+                    setTimeout(() => fetchPrayers(retryCount + 1), 2000);
+                    return;
+                }
+                throw error;
+            }
 
             if (transactions && transactions.length > 0) {
                 // Filter for valid UUIDs to prevent 400 Bad Request
@@ -131,7 +145,6 @@ export default function PrayersPage() {
 
                     setPrayers(prayersWithCampaigns);
                 } else {
-                    // No valid campaigns, fallback
                     const prayersWithCampaigns = transactions.map(tx => ({
                         ...tx,
                         campaign_title: 'Campaign',
@@ -139,13 +152,19 @@ export default function PrayersPage() {
                     }));
                     setPrayers(prayersWithCampaigns);
                 }
+            } else {
+                setPrayers([]);
             }
-
-
-        } catch (error) {
-            console.error('Error fetching prayers:', error);
+        } catch (err: any) {
+            console.error('Error fetching prayers:', err);
+            if (isNetworkError(err) && retryCount < 2) {
+                setTimeout(() => fetchPrayers(retryCount + 1), 2000);
+                return;
+            }
         } finally {
-            setLoading(false);
+            if (retryCount === 0 || !loading) {
+                setLoading(false);
+            }
         }
     };
 

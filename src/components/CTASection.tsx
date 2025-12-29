@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { SkeletonImage, SkeletonBox } from './SkeletonLoader';
 
 const DEFAULT_SLIDES = [
   {
@@ -89,7 +90,16 @@ export default function CTASection() {
     }
   };
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="py-4 bg-white mb-2">
+        <div className="w-full max-w-[480px] mx-auto px-4">
+          <SkeletonImage className="w-full aspect-[16/9] rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
   if (items.length === 0) return null;
 
   return (

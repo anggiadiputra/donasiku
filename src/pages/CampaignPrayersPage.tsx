@@ -4,6 +4,7 @@ import { ArrowLeft, Search, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { CampaignPrayersSkeleton } from '../components/SkeletonLoader';
+import { isNetworkError } from '../utils/errorHandling';
 
 // Utility functions
 const getTimeAgo = (dateString: string) => {
@@ -34,7 +35,6 @@ export default function CampaignPrayersPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [campaignTitle, setCampaignTitle] = useState('');
     // Force update for UI re-render on amen click
-    // Force update for UI re-render on amen click
     const [, setUpdateTrigger] = useState(0);
 
     useEffect(() => {
@@ -43,7 +43,7 @@ export default function CampaignPrayersPage() {
         }
     }, [slug]);
 
-    const fetchData = async () => {
+    const fetchData = async (retryCount = 0) => {
         try {
             setLoading(true);
 
@@ -54,7 +54,16 @@ export default function CampaignPrayersPage() {
                 .eq('slug', slug)
                 .single();
 
-            if (campaignError || !campaign) throw new Error('Campaign not found');
+            if (campaignError) {
+                if (isNetworkError(campaignError) && retryCount < 2) {
+                    console.warn(`Campaign lookup network issue, retrying (${retryCount + 1})...`);
+                    setTimeout(() => fetchData(retryCount + 1), 2000);
+                    return;
+                }
+                throw new Error('Campaign not found');
+            }
+
+            if (!campaign) throw new Error('Campaign not found');
             setCampaignTitle(campaign.title);
 
             // 2. Fetch Transactions (Messages)
@@ -66,7 +75,14 @@ export default function CampaignPrayersPage() {
                 .not('customer_message', 'is', null)
                 .neq('customer_message', '');
 
-            if (txError) throw txError;
+            if (txError) {
+                if (isNetworkError(txError) && retryCount < 2) {
+                    console.warn(`Transactions fetch network issue, retrying (${retryCount + 1})...`);
+                    setTimeout(() => fetchData(retryCount + 1), 2000);
+                    return;
+                }
+                throw txError;
+            }
 
             // 3. Fetch Testimonials
             const { data: testData, error: testError } = await supabase
@@ -74,7 +90,14 @@ export default function CampaignPrayersPage() {
                 .select('*')
                 .eq('campaign_id', campaign.id);
 
-            if (testError) throw testError;
+            if (testError) {
+                if (isNetworkError(testError) && retryCount < 2) {
+                    console.warn(`Testimonials fetch network issue, retrying (${retryCount + 1})...`);
+                    setTimeout(() => fetchData(retryCount + 1), 2000);
+                    return;
+                }
+                throw testError;
+            }
 
             // Combine and map
             const txMessages = (txData || []).map(tx => ({
@@ -101,10 +124,16 @@ export default function CampaignPrayersPage() {
 
             setTestimonials(allPrayers);
 
-        } catch (error) {
-            console.error('Error fetching prayers:', error);
+        } catch (err: any) {
+            console.error('Error fetching prayers:', err);
+            if (isNetworkError(err) && retryCount < 2) {
+                setTimeout(() => fetchData(retryCount + 1), 2000);
+                return;
+            }
         } finally {
-            setLoading(false);
+            if (retryCount === 0 || !loading) {
+                setLoading(false);
+            }
         }
     };
 

@@ -17,6 +17,7 @@ export default function CategoryNav() {
   const navigate = useNavigate();
   const primaryColor = usePrimaryColor();
   const hoverColor = getHoverColor(primaryColor);
+  const [loading, setLoading] = useState(true);
   const [programItems, setProgramItems] = useState<ProgramMendadakItem[]>([]);
   const [title, setTitle] = useState('Program Mendadak');
   const [enabled, setEnabled] = useState(true);
@@ -27,6 +28,7 @@ export default function CategoryNav() {
 
   const fetchProgramSettings = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('layout_settings')
         .select('program_mendadak_enabled, program_mendadak_title, program_mendadak_items')
@@ -71,6 +73,8 @@ export default function CategoryNav() {
         { name: 'Fidyah', icon: 'calendar', url: '/fidyah' },
       ]);
       setTitle('Program Unggulan');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -89,6 +93,27 @@ export default function CategoryNav() {
     // Fallback to heart icon
     return <LucideIcons.Heart className="w-8 h-8" />;
   };
+
+  if (loading) {
+    return (
+      <div className="bg-white py-8 shadow-sm">
+        <div className="w-full max-w-[480px] mx-auto px-4">
+          {/* Title Skeleton */}
+          <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mx-auto mb-6" />
+
+          {/* Grid Skeleton */}
+          <div className="grid grid-cols-4 gap-6 max-w-3xl mx-auto">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex flex-col items-center gap-2 p-4">
+                <div className="w-16 h-16 rounded-full bg-gray-200 animate-pulse" />
+                <div className="h-4 w-12 bg-gray-200 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!enabled) {
     return null;

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Search, Mail, Phone, Calendar, DollarSign, Heart, User } from 'lucide-react';
+import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { darkenColor } from '../utils/colorUtils';
@@ -63,7 +64,9 @@ export default function ZiswafPage() {
 
     const handleSearch = async () => {
         if (!searchValue.trim()) {
-            alert('Mohon masukkan nomor WhatsApp atau email');
+            toast.error('Data tidak lengkap', {
+                description: 'Mohon masukkan nomor WhatsApp atau email untuk mencari riwayat donasi'
+            });
             return;
         }
 
@@ -135,7 +138,9 @@ export default function ZiswafPage() {
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Terjadi kesalahan saat mencari data');
+            toast.error('Pencarian Gagal', {
+                description: 'Terjadi kesalahan saat mencari data riwayat donasi Anda'
+            });
         } finally {
             setLoading(false);
         }

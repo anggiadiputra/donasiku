@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   Upload,
@@ -67,7 +68,9 @@ export default function EditCampaignPage() {
 
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
-      alert('Nama kategori tidak boleh kosong');
+      toast.error('Gagal menambahkan kategori', {
+        description: 'Nama kategori tidak boleh kosong'
+      });
       return;
     }
 
@@ -87,9 +90,13 @@ export default function EditCampaignPage() {
 
       if (error) {
         if (error.code === '23505') { // Unique constraint violation
-          alert('Kategori dengan nama ini sudah ada');
+          toast.error('Kategori sudah ada', {
+            description: 'Kategori dengan nama ini sudah terdaftar'
+          });
         } else {
-          alert('Gagal menambahkan kategori: ' + error.message);
+          toast.error('Gagal menambahkan kategori', {
+            description: error.message
+          });
         }
         return;
       }
@@ -99,11 +106,15 @@ export default function EditCampaignPage() {
         setCategoryId(data.id);
         setNewCategoryName('');
         setShowAddCategory(false);
-        alert('Kategori berhasil ditambahkan!');
+        toast.success('Kategori ditambahkan', {
+          description: `Kategori "${data.name}" berhasil dibuat`
+        });
       }
     } catch (error: any) {
       console.error('Error adding category:', error);
-      alert('Terjadi kesalahan saat menambahkan kategori');
+      toast.error('Terjadi kesalahan', {
+        description: 'Gagal menambahkan kategori karena kesalahan sistem'
+      });
     }
   };
 
@@ -115,7 +126,9 @@ export default function EditCampaignPage() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        alert('Anda harus login untuk mengedit campaign');
+        toast.error('Sesi berakhir', {
+          description: 'Anda harus login kembali untuk mengedit campaign'
+        });
         navigate('/login');
         return;
       }
@@ -129,7 +142,9 @@ export default function EditCampaignPage() {
 
       if (error) {
         console.error('Error fetching campaign:', error);
-        alert('Gagal memuat campaign: ' + error.message);
+        toast.error('Gagal memuat data', {
+          description: 'Campaign tidak ditemukan atau terjadi kesalahan saat mengambil data'
+        });
         navigate('/donasi/campaigns');
         return;
       }
@@ -164,7 +179,9 @@ export default function EditCampaignPage() {
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Terjadi kesalahan saat memuat campaign');
+      toast.error('Kesalahan Sistem', {
+        description: 'Terjadi kesalahan saat memuat campaign'
+      });
       navigate('/donasi/campaigns');
     } finally {
       setFetching(false);
@@ -248,12 +265,16 @@ export default function EditCampaignPage() {
     // Strip HTML tags for validation
     const textContent = description.replace(/<[^>]*>/g, '').trim();
     if (!title.trim() || !textContent) {
-      alert('Judul dan Keterangan wajib diisi');
+      toast.error('Data tidak lengkap', {
+        description: 'Judul dan Keterangan wajib diisi sebelum menyimpan'
+      });
       return;
     }
 
     if (!id || !campaign) {
-      alert('Campaign tidak ditemukan');
+      toast.error('Campaign tidak ditemukan', {
+        description: 'ID Campaign tidak valid atau campaign telah dihapus'
+      });
       navigate('/donasi/campaigns');
       return;
     }
@@ -278,7 +299,9 @@ export default function EditCampaignPage() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        alert('Anda harus login untuk mengedit campaign');
+        toast.error('Sesi berakhir', {
+          description: 'Silakan login kembali untuk menyimpan perubahan'
+        });
         navigate('/login');
         return;
       }
@@ -310,14 +333,23 @@ export default function EditCampaignPage() {
 
       if (error) {
         console.error('Error updating campaign:', error);
-        alert('Gagal menyimpan campaign: ' + error.message);
+        toast.error('Gagal memperbarui campaign', {
+          description: error.message
+        });
       } else {
-        alert(publish ? 'Campaign berhasil dipublish!' : 'Campaign berhasil disimpan!');
+        toast.success(publish ? 'Campaign Berhasil Dipublish!' : 'Perubahan Disimpan', {
+          description: publish
+            ? 'Campaign Anda sekarang aktif dan dapat dilihat oleh publik.'
+            : 'Detail campaign telah berhasil diperbarui.',
+          duration: 5000,
+        });
         navigate('/donasi/campaigns');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Terjadi kesalahan saat menyimpan campaign');
+      toast.error('Terjadi kesalahan', {
+        description: 'Gagal melakukan pembaruan campaign'
+      });
     } finally {
       setLoading(false);
     }

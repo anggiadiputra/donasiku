@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase, HeroSliderItem } from '../lib/supabase';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
+import { SkeletonImage } from './SkeletonLoader';
 
 export default function HeroBanner() {
   const navigate = useNavigate();
@@ -98,16 +99,14 @@ export default function HeroBanner() {
 
   if (loading || sliderItems.length === 0) {
     return (
-      <div className="relative w-full h-[220px] bg-gray-200 animate-pulse">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-gray-400 text-sm">Loading...</div>
-        </div>
+      <div className="relative w-full h-[260px]">
+        <SkeletonImage className="w-full h-full" />
       </div>
     );
   }
 
   return (
-    <div className="relative w-full h-[220px] overflow-hidden">
+    <div className="relative w-full h-[260px] overflow-hidden">
       {/* Slider Images */}
       <div className="relative w-full h-full overflow-hidden">
         {sliderItems.map((item, index) => {

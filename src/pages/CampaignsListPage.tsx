@@ -7,6 +7,7 @@ import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { createSlug } from '../utils/slug';
 import { CampaignsListPageSkeleton } from '../components/SkeletonLoader';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { isNetworkError, isDatabaseRelationshipError } from '../utils/errorHandling';
 
 const CAMPAIGNS_PER_PAGE = 10;
 
@@ -24,6 +25,7 @@ export default function CampaignsListPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const observerTarget = useRef<HTMLDivElement>(null);
+
   // Fetch categories on mount
   useEffect(() => {
     fetchCategories();
@@ -46,7 +48,7 @@ export default function CampaignsListPage() {
     fetchCampaigns(0, true);
   }, [debouncedSearchQuery, selectedCategory]);
 
-  const fetchCategories = async () => {
+  const fetchCategories = async (retryCount = 0) => {
     try {
       const { data, error } = await supabase
         .from('categories')
@@ -54,6 +56,10 @@ export default function CampaignsListPage() {
         .order('name');
 
       if (error) {
+        if (isNetworkError(error) && retryCount < 2) {
+          setTimeout(() => fetchCategories(retryCount + 1), 2000);
+          return;
+        }
         console.error('Error fetching categories:', error);
       } else {
         setCategories(data || []);
@@ -63,7 +69,7 @@ export default function CampaignsListPage() {
     }
   };
 
-  const fetchCampaigns = async (pageNum: number, isInitial = false) => {
+  const fetchCampaigns = async (pageNum: number, isInitial = false, retryCount = 0) => {
     try {
       if (isInitial) {
         setLoading(true);
@@ -95,14 +101,19 @@ export default function CampaignsListPage() {
         .range(from, to);
 
       if (error) {
-        console.error('Error fetching campaigns:', error);
+        console.error('Page fetchCampaigns error:', error);
 
-        // If RLS policy issue, try alternative query
-        // If RLS policy issue or Relationship issue, try alternative query
-        if (error.code === '42501' || error.code === 'PGRST200' || error.message.includes('permission') || error.message.includes('policy') || error.message.includes('relationship')) {
-          console.warn('Data fetching issue detected. Trying basic fallback query...', error.message);
+        // 1. Handle Network Errors
+        if (isNetworkError(error) && retryCount < 2) {
+          console.warn(`Network issue on page, retrying (${retryCount + 1})...`);
+          setTimeout(() => fetchCampaigns(pageNum, isInitial, retryCount + 1), 2000);
+          return;
+        }
 
-          // Try alternative query (basic select without joins)
+        // 2. Handle Relationship/Permission Errors with Fallback
+        if (isDatabaseRelationshipError(error) || isNetworkError(error)) {
+          console.warn('Attempting page fallback query due to fetching issue...');
+
           let altQuery = supabase
             .from('campaigns')
             .select('*')
@@ -135,15 +146,21 @@ export default function CampaignsListPage() {
       }
 
       handleCampaignsData(data || [], isInitial);
-    } catch (error) {
-      console.error('Error:', error);
+    } catch (err: any) {
+      console.error('Unexpected page error:', err);
+      if (isNetworkError(err) && retryCount < 2) {
+        setTimeout(() => fetchCampaigns(pageNum, isInitial, retryCount + 1), 2000);
+        return;
+      }
       if (isInitial) {
         setCampaigns([]);
       }
       setHasMore(false);
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (retryCount === 0 || !loading) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   };
 

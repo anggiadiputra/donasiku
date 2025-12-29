@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { supabase } from '../lib/supabase';
+import { SkeletonImage, SkeletonBox } from './SkeletonLoader';
 
 const DEFAULT_ITEMS = [
     {
@@ -88,10 +89,10 @@ export default function PromoSlider() {
 
     if (loading) {
         return (
-            <div className="py-2 bg-white mb-2 animate-pulse">
+            <div className="py-2 bg-white mb-2">
                 <div className="w-full max-w-[480px] mx-auto px-4">
-                    <div className="h-6 w-1/3 bg-gray-200 rounded mb-4"></div>
-                    <div className="w-full aspect-[16/9] bg-gray-200 rounded-2xl"></div>
+                    <SkeletonBox className="h-6 w-1/3 mb-4 mt-2" />
+                    <SkeletonImage className="w-full aspect-[16/9] rounded-2xl" />
                 </div>
             </div>
         );
@@ -172,8 +173,8 @@ export default function PromoSlider() {
                                         setCurrentIndex(idx);
                                     }}
                                     className={`transition-all duration-300 rounded-full shadow-sm hover:bg-white ${idx === currentIndex
-                                            ? 'w-6 h-1.5 bg-white'
-                                            : 'w-1.5 h-1.5 bg-white/60'
+                                        ? 'w-6 h-1.5 bg-white'
+                                        : 'w-1.5 h-1.5 bg-white/60'
                                         }`}
                                     aria-label={`Go to slide ${idx + 1}`}
                                 />

@@ -6,23 +6,13 @@ import Sidebar from '../components/Sidebar';
 import { useAppName } from '../hooks/useAppName';
 import { TableSkeleton } from '../components/SkeletonLoader';
 import { usePageTitle } from '../hooks/usePageTitle';
-
-interface Donor {
-    customer_name: string;
-    customer_phone: string;
-    customer_email: string;
-    total_donations: number;
-    total_amount: number;
-    first_donation: string;
-    last_donation: string;
-    campaigns_supported: number;
-}
+import { isNetworkError } from '../utils/errorHandling';
 
 export default function DonatursPage() {
     usePageTitle('Data Donatur');
     const navigate = useNavigate();
     const { appName } = useAppName();
-    const [donors, setDonors] = useState<Donor[]>([]);
+    const [donors, setDonors] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [entriesPerPage, setEntriesPerPage] = useState(10);
@@ -38,7 +28,7 @@ export default function DonatursPage() {
         fetchDonors();
     }, []);
 
-    const fetchDonors = async () => {
+    const fetchDonors = async (retryCount = 0) => {
         try {
             setLoading(true);
 
@@ -49,10 +39,21 @@ export default function DonatursPage() {
                 .eq('status', 'success')
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error fetching donors:', error);
+
+                // Handle Network Errors
+                if (isNetworkError(error) && retryCount < 2) {
+                    console.warn(`Donors network issue, retrying (${retryCount + 1})...`);
+                    setTimeout(() => fetchDonors(retryCount + 1), 2000);
+                    return;
+                }
+                setDonors([]);
+                return;
+            }
 
             // Group by donor (phone or email)
-            const donorMap = new Map<string, Donor>();
+            const donorMap = new Map<string, any>();
 
             transactions?.forEach((tx) => {
                 const key = tx.customer_phone || tx.customer_email || 'unknown';
@@ -80,7 +81,7 @@ export default function DonatursPage() {
                         total_amount: tx.amount,
                         first_donation: tx.created_at,
                         last_donation: tx.created_at,
-                        campaigns_supported: 0, // Will calculate below
+                        campaigns_supported: 0,
                     });
                 }
             });
@@ -90,7 +91,6 @@ export default function DonatursPage() {
                 const key = tx.customer_phone || tx.customer_email || 'unknown';
                 const donor = donorMap.get(key);
                 if (donor) {
-                    // Count unique campaign_ids
                     const donorTxs = transactions.filter(
                         t => (t.customer_phone || t.customer_email) === key
                     );
@@ -101,10 +101,17 @@ export default function DonatursPage() {
 
             const donorsList = Array.from(donorMap.values());
             setDonors(donorsList);
-        } catch (error) {
-            console.error('Error fetching donors:', error);
+        } catch (err: any) {
+            console.error('Unexpected Donors error:', err);
+            if (isNetworkError(err) && retryCount < 2) {
+                setTimeout(() => fetchDonors(retryCount + 1), 2000);
+                return;
+            }
+            setDonors([]);
         } finally {
-            setLoading(false);
+            if (retryCount === 0 || !loading) {
+                setLoading(false);
+            }
         }
     };
 

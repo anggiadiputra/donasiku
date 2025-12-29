@@ -33,7 +33,7 @@ export const SkeletonImage = ({
     <div className={`${className} bg-gradient-to-br from-gray-200 via-gray-300 to-gray-200 animate-shimmer bg-[length:200%_100%]`} />
 );
 
-// Campaign Card Skeleton
+// Campaign Card Skeleton (Horizontal/Grid)
 export const CampaignCardSkeleton = () => (
     <div className="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-100 w-full flex">
         {/* Image skeleton */}
@@ -57,6 +57,56 @@ export const CampaignCardSkeleton = () => (
                     <SkeletonBox className="h-3 w-12 mb-1" />
                     <SkeletonBox className="h-5 w-8" />
                 </div>
+            </div>
+        </div>
+    </div>
+);
+
+// Campaign Slider Item Skeleton (Vertical card for horizontal scrolls)
+export const CampaignSliderItemSkeleton = () => (
+    <div className="w-[260px] flex-shrink-0 bg-white border border-gray-200 rounded-xl overflow-hidden">
+        {/* Image */}
+        <SkeletonImage className="h-[140px] w-full" />
+
+        {/* Content */}
+        <div className="p-4 flex flex-col h-[180px] justify-between">
+            <div>
+                {/* Organization */}
+                <div className="flex items-center gap-1.5 mb-2">
+                    <SkeletonCircle size="w-4 h-4" />
+                    <SkeletonBox className="h-3 w-24" />
+                </div>
+
+                {/* Title */}
+                <SkeletonText lines={2} className="mb-3" />
+            </div>
+
+            {/* Progress & Stats */}
+            <div>
+                <SkeletonBox className="w-full h-1.5 rounded-full mb-3" />
+                <div className="flex justify-between items-end">
+                    <div>
+                        <SkeletonBox className="h-3 w-12 mb-1" />
+                        <SkeletonBox className="h-5 w-24" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
+// Campaign Slider Section Skeleton
+export const CampaignSliderSkeleton = () => (
+    <div className="py-6 bg-white border-b border-gray-100">
+        <div className="w-full max-w-[480px] mx-auto px-4">
+            <div className="flex items-center justify-between mb-4">
+                <SkeletonBox className="h-6 w-32" />
+                <SkeletonBox className="h-4 w-20" />
+            </div>
+            <div className="flex gap-4 overflow-hidden -ml-4 pl-4">
+                {[1, 2].map(i => (
+                    <CampaignSliderItemSkeleton key={i} />
+                ))}
             </div>
         </div>
     </div>

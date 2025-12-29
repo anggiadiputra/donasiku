@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Menu, Bell, LogOut, Pencil, Trash2 } from 'lucide-react';
@@ -9,6 +8,7 @@ import { supabase, Campaign } from '../lib/supabase';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { TableSkeleton } from '../components/SkeletonLoader';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { isNetworkError, isDatabaseRelationshipError } from '../utils/errorHandling';
 
 export default function CampaignsPage() {
   usePageTitle('Data Campaign');
@@ -43,7 +43,7 @@ export default function CampaignsPage() {
 
   const appInitial = appName.charAt(0).toUpperCase();
 
-  const fetchCampaigns = async () => {
+  const fetchCampaigns = async (retryCount = 0) => {
     try {
       setLoading(true);
 
@@ -76,11 +76,18 @@ export default function CampaignsPage() {
         .range(from, to);
 
       if (error) {
-        console.error('Error fetching campaigns:', error);
+        console.error('Admin fetchCampaigns error:', error);
 
-        // Fallback for missing relationship or permissions
-        if (error.code === '42501' || error.code === 'PGRST200' || error.message.includes('permission') || error.message.includes('policy') || error.message.includes('relationship')) {
-          console.warn('Falling back to basic query...');
+        // 1. Handle Network Errors
+        if (isNetworkError(error) && retryCount < 2) {
+          console.warn(`Admin network issue, retrying (${retryCount + 1})...`);
+          setTimeout(() => fetchCampaigns(retryCount + 1), 2000);
+          return;
+        }
+
+        // 2. Handle Relationship/Permission Errors with Fallback or Network Failures
+        if (isDatabaseRelationshipError(error) || isNetworkError(error)) {
+          console.warn('Attempting Admin fallback query...');
 
           let fallbackQuery = supabase
             .from('campaigns')
@@ -105,41 +112,37 @@ export default function CampaignsPage() {
 
           if (!fallbackError && fallbackData) {
             if (fallbackCount !== null) setTotalCount(fallbackCount);
-
-            // Process fallback data (same as main path)
-            const campaignsWithDonors = await Promise.all(
-              fallbackData.map(async (campaign) => {
-                const { count } = await supabase
-                  .from('transactions')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('campaign_id', campaign.id)
-                  .eq('status', 'success');
-
-                const { data: recentDonors } = await supabase
-                  .from('transactions')
-                  .select('customer_name')
-                  .eq('campaign_id', campaign.id)
-                  .eq('status', 'success')
-                  .order('created_at', { ascending: false })
-                  .limit(3);
-
-                return {
-                  ...campaign,
-                  donor_count: count || 0,
-                  recent_donors: recentDonors || []
-                };
-              })
-            );
-            setCampaigns(campaignsWithDonors);
+            await processCampaignsWithStats(fallbackData);
             return;
           }
         }
+
+        setCampaigns([]);
       } else {
         if (count !== null) setTotalCount(count);
+        await processCampaignsWithStats(data || []);
+      }
+    } catch (err: any) {
+      console.error('Unexpected Admin error:', err);
+      if (isNetworkError(err) && retryCount < 2) {
+        setTimeout(() => fetchCampaigns(retryCount + 1), 2000);
+        return;
+      }
+      setCampaigns([]);
+    } finally {
+      if (retryCount === 0 || !loading) {
+        setLoading(false);
+      }
+    }
+  };
 
-        // Fetch donor counts ONLY for the fetched page
-        const campaignsWithDonors = await Promise.all(
-          (data || []).map(async (campaign) => {
+  const processCampaignsWithStats = async (data: any[]) => {
+    try {
+      // Fetch donor counts ONLY for the fetched page
+      const campaignsWithDonors = await Promise.all(
+        data.map(async (campaign) => {
+          // Wrap individual fetches in try-catch to prevent one failure from breaking all
+          try {
             const { count } = await supabase
               .from('transactions')
               .select('*', { count: 'exact', head: true })
@@ -159,14 +162,19 @@ export default function CampaignsPage() {
               donor_count: count || 0,
               recent_donors: recentDonors || []
             };
-          })
-        );
-        setCampaigns(campaignsWithDonors);
-      }
+          } catch (e) {
+            return {
+              ...campaign,
+              donor_count: 0,
+              recent_donors: []
+            };
+          }
+        })
+      );
+      setCampaigns(campaignsWithDonors);
     } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error processing campaign stats:', error);
+      setCampaigns(data);
     }
   };
 
