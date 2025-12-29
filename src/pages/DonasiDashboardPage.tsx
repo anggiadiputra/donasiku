@@ -18,6 +18,7 @@ interface Transaction {
     customer_message: string;
     amount: number;
     payment_method: string;
+    payment_method_name?: string;
     status: string;
     campaign_id: string;
     created_at: string;
@@ -222,6 +223,30 @@ export default function DonasiDashboardPage() {
         };
         const key = status?.toLowerCase() || 'pending';
         return <span className={`px-2 py-1 rounded text-xs font-semibold ${styles[key] || 'bg-gray-100'}`}>{labels[key] || status}</span>;
+    };
+
+    const getPaymentMethodName = (code: string) => {
+        const map: Record<string, string> = {
+            'VC': 'Credit Card',
+            'BK': 'BCA KlikPay',
+            'BC': 'BCA Virtual Account',
+            'M1': 'Mandiri Virtual Account',
+            'B1': 'CIMB Niaga Virtual Account',
+            'I1': 'BNI Virtual Account',
+            'BT': 'Permata Virtual Account',
+            'A1': 'ATM Bersama',
+            'OV': 'OVO',
+            'DA': 'DANA',
+            'LA': 'LinkAja',
+            'SA': 'ShopeePay',
+            'QR': 'QRIS',
+            'LQ': 'LinkAja App',
+            'NQ': 'Nobu',
+            'BR': 'BRI Virtual Account',
+            'D1': 'Danamon Virtual Account',
+            'S1': 'Sampoerna Virtual Account',
+        };
+        return map[code] || code;
     };
 
     const filteredTransactions = transactions.filter((tx) =>
@@ -433,20 +458,18 @@ export default function DonasiDashboardPage() {
                                                         )}
                                                     </td>
                                                     <td className="px-6 py-4 text-sm whitespace-nowrap">
-                                                        {tx.status === 'pending' ? (
-                                                            <button
-                                                                onClick={() => handleFollowUp(tx)}
-                                                                className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-600 rounded-full hover:bg-green-100 transition-colors border border-green-200 shadow-sm"
-                                                                title="Follow up via WhatsApp"
-                                                            >
-                                                                <MessageCircle className="w-3.5 h-3.5" />
-                                                                <span className="text-xs font-medium">Follow Up</span>
-                                                            </button>
-                                                        ) : (
-                                                            <span className="text-gray-400 text-xs flex items-center gap-1">
-                                                                {tx.payment_method || '-'}
-                                                            </span>
-                                                        )}
+                                                        <button
+                                                            onClick={() => tx.status === 'pending' && handleFollowUp(tx)}
+                                                            disabled={tx.status !== 'pending'}
+                                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm transition-colors ${tx.status === 'pending'
+                                                                    ? 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100 cursor-pointer'
+                                                                    : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-70'
+                                                                }`}
+                                                            title={tx.status === 'pending' ? "Follow up via WhatsApp" : "Follow up disabled"}
+                                                        >
+                                                            <MessageCircle className="w-3.5 h-3.5" />
+                                                            <span className="text-xs font-medium">Follow Up</span>
+                                                        </button>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(tx.status)}</td>
                                                     <td className="px-6 py-4 whitespace-nowrap">

@@ -11,7 +11,8 @@ import {
   ChevronRight,
   Coins,
   Users,
-  UserCog
+  UserCog,
+  MessageCircle
 } from 'lucide-react';
 import { useAppSettings } from '../hooks/useAppSettings';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
@@ -34,6 +35,11 @@ const menuItems: MenuItem[] = [
     label: 'Dashboard',
     icon: <LayoutDashboard className="w-5 h-5" />,
     path: '/dashboard'
+  },
+  {
+    label: 'Pesan Masuk',
+    icon: <MessageCircle className="w-5 h-5" />,
+    path: '/dashboard/messages'
   },
   {
     label: 'Donasi',

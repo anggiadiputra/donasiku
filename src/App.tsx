@@ -58,6 +58,7 @@ import FidyahPage from './pages/FidyahPage';
 import FidyahSettingsPage from './pages/FidyahSettingsPage';
 import FidyahDonationsPage from './pages/FidyahDonationsPage';
 import ZiswafPage from './pages/ZiswafPage';
+import WhatsAppMessagesPage from './pages/WhatsAppMessagesPage';
 import DonatursPage from './pages/DonatursPage';
 import CampaignersPage from './pages/CampaignersPage';
 import PrayersPage from './pages/PrayersPage';
@@ -67,6 +68,7 @@ import CampaignPrayersPage from './pages/CampaignPrayersPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ThemeProvider from './components/ThemeProvider';
+import WhatsAppFloatingButton from './components/WhatsAppFloatingButton';
 
 import { usePageTitle } from './hooks/usePageTitle';
 import { useAppName } from './hooks/useAppName';
@@ -264,6 +266,14 @@ function AppContent() {
         }
       />
       <Route
+        path="/dashboard/messages"
+        element={
+          <ProtectedRoute>
+            <WhatsAppMessagesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/settings"
         element={
           <ProtectedRoute>
@@ -321,6 +331,7 @@ function AppContent() {
     <div className="min-h-screen bg-gray-50 flex justify-center">
       <div className="w-full max-w-[480px] mx-auto bg-white shadow-2xl min-h-screen relative">
         {content}
+        {!isDashboardRoute && <WhatsAppFloatingButton />}
       </div>
     </div>
   );
