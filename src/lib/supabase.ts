@@ -41,6 +41,11 @@ export interface Campaign {
   status?: 'draft' | 'published';
   created_at: string;
   updated_at: string;
+  profiles?: {
+    full_name: string;
+    organization_name?: string;
+    avatar_url?: string;
+  };
 }
 
 export interface Category {
@@ -102,6 +107,9 @@ export interface AppSettings {
   s3_secret_access_key?: string;
   s3_public_url?: string;
   s3_api_endpoint?: string;
+  google_analytics_id?: string;
+  facebook_pixel_id?: string;
+  tiktok_pixel_id?: string;
   created_at: string;
   updated_at: string;
 }

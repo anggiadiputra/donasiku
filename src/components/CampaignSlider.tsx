@@ -57,7 +57,7 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                 // 2. Fetch Campaigns based on settings
                 let query = supabase
                     .from('campaigns')
-                    .select('*')
+                    .select('*, profiles:user_id(full_name, organization_name, avatar_url)')
                     .eq('status', 'published')
                     .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 
@@ -71,11 +71,13 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                         const { data, error } = await query
                             .order('created_at', { ascending: false })
                             .limit(10);
+                        if (error) throw error;
                         if (data) setCampaigns(data);
                     } else {
                         // Fetch specific campaigns
                         const { data, error } = await query.in('id', validIds);
 
+                        if (error) throw error;
                         if (data) {
                             // Sort by the order in ids
                             const sortedData = ids
@@ -90,6 +92,7 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                         .order('created_at', { ascending: false })
                         .limit(10);
 
+                    if (error) throw error;
                     if (data) setCampaigns(data);
                 }
 
@@ -97,15 +100,34 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                 // Fallback if no settings
                 const { data, error } = await supabase
                     .from('campaigns')
-                    .select('*')
+                    .select('*, profiles:user_id(full_name, organization_name, avatar_url)')
                     .eq('status', 'published')
                     .order('created_at', { ascending: false })
                     .limit(10);
+                if (error) throw error;
                 if (data) setCampaigns(data);
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error:', error);
+
+            // Fallback for missing relationship or permissions
+            if (error.code === '42501' || error.code === 'PGRST200' || error?.message?.includes('relationship')) {
+                console.warn('Falling back to basic query in Slider...');
+                const { data: fallbackData } = await supabase
+                    .from('campaigns')
+                    .select('*')
+                    .eq('status', 'published')
+                    .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")')
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+
+                if (fallbackData) {
+                    setCampaigns(fallbackData);
+                    return;
+                }
+            }
+
             setCampaigns([]);
         } finally {
             setLoading(false);
@@ -190,7 +212,7 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                                         {/* Organization */}
                                         <div className="flex items-center gap-1.5 mb-2">
                                             <span className="text-xs font-medium text-gray-600 truncate max-w-[140px]">
-                                                {campaign.organization_name || 'Donasiku'}
+                                                {campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Donasiku'}
                                             </span>
                                             {campaign.is_verified && (
                                                 <CheckCircle className="w-3 h-3 text-blue-500 fill-current" />

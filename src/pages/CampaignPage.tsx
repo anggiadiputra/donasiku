@@ -407,7 +407,7 @@ export default function CampaignPage() {
                 <div>
                   <div className="flex items-center gap-1">
                     <span className="font-bold text-gray-900 text-sm">
-                      {campaign.organization_name || appName || 'Donasiku'}
+                      {campaign.profiles?.organization_name || campaign.organization_name || appName || 'Donasiku'}
                     </span>
                     {/* Verified Badge */}
                     <svg className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="none">

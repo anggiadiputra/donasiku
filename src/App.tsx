@@ -69,6 +69,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ThemeProvider from './components/ThemeProvider';
 import WhatsAppFloatingButton from './components/WhatsAppFloatingButton';
+import AnalyticsScripts from './components/AnalyticsScripts';
 
 import { usePageTitle } from './hooks/usePageTitle';
 import { useAppName } from './hooks/useAppName';
@@ -343,6 +344,7 @@ function App() {
     <ThemeProvider>
       <Router>
         <Toaster position="top-center" richColors />
+        <AnalyticsScripts />
         <AppContent />
       </Router>
     </ThemeProvider>

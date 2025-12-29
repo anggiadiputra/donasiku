@@ -76,7 +76,7 @@ export default function CampaignsListPage() {
 
       let query = supabase
         .from('campaigns')
-        .select('*')
+        .select('*, profiles:user_id(full_name, organization_name, avatar_url)')
         .eq('status', 'published')
         .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 
@@ -98,10 +98,11 @@ export default function CampaignsListPage() {
         console.error('Error fetching campaigns:', error);
 
         // If RLS policy issue, try alternative query
-        if (error.code === '42501' || error.message.includes('permission') || error.message.includes('policy')) {
-          console.warn('RLS policy issue detected. Trying alternative query...');
+        // If RLS policy issue or Relationship issue, try alternative query
+        if (error.code === '42501' || error.code === 'PGRST200' || error.message.includes('permission') || error.message.includes('policy') || error.message.includes('relationship')) {
+          console.warn('Data fetching issue detected. Trying basic fallback query...', error.message);
 
-          // Try alternative query with filters
+          // Try alternative query (basic select without joins)
           let altQuery = supabase
             .from('campaigns')
             .select('*')

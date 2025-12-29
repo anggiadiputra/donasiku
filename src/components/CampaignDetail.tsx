@@ -187,7 +187,7 @@ export default function CampaignDetail({ campaign, isOpen, onClose }: CampaignDe
                 </div>
                 <div>
                   <p className="font-semibold text-gray-800">
-                    {campaign.organization_name || 'Donasiku'}
+                    {campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Donasiku'}
                   </p>
                   <p className="text-xs text-gray-500">Verified Organization</p>
                 </div>
@@ -299,4 +299,3 @@ export default function CampaignDetail({ campaign, isOpen, onClose }: CampaignDe
     </div>
   );
 }
-```

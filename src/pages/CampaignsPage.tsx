@@ -49,7 +49,7 @@ export default function CampaignsPage() {
 
       let query = supabase
         .from('campaigns')
-        .select('*', { count: 'exact' })
+        .select('*, profiles:user_id(full_name, organization_name)', { count: 'exact' })
         // Exclude system campaigns
         .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 
@@ -77,6 +77,63 @@ export default function CampaignsPage() {
 
       if (error) {
         console.error('Error fetching campaigns:', error);
+
+        // Fallback for missing relationship or permissions
+        if (error.code === '42501' || error.code === 'PGRST200' || error.message.includes('permission') || error.message.includes('policy') || error.message.includes('relationship')) {
+          console.warn('Falling back to basic query...');
+
+          let fallbackQuery = supabase
+            .from('campaigns')
+            .select('*', { count: 'exact' })
+            .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
+
+          if (searchQuery) {
+            fallbackQuery = fallbackQuery.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+          }
+
+          if (campaignerId) {
+            if (campaignerId === 'null') {
+              fallbackQuery = fallbackQuery.is('user_id', null);
+            } else {
+              fallbackQuery = fallbackQuery.eq('user_id', campaignerId);
+            }
+          }
+
+          const { data: fallbackData, count: fallbackCount, error: fallbackError } = await fallbackQuery
+            .order('created_at', { ascending: false })
+            .range(from, to);
+
+          if (!fallbackError && fallbackData) {
+            if (fallbackCount !== null) setTotalCount(fallbackCount);
+
+            // Process fallback data (same as main path)
+            const campaignsWithDonors = await Promise.all(
+              fallbackData.map(async (campaign) => {
+                const { count } = await supabase
+                  .from('transactions')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('campaign_id', campaign.id)
+                  .eq('status', 'success');
+
+                const { data: recentDonors } = await supabase
+                  .from('transactions')
+                  .select('customer_name')
+                  .eq('campaign_id', campaign.id)
+                  .eq('status', 'success')
+                  .order('created_at', { ascending: false })
+                  .limit(3);
+
+                return {
+                  ...campaign,
+                  donor_count: count || 0,
+                  recent_donors: recentDonors || []
+                };
+              })
+            );
+            setCampaigns(campaignsWithDonors);
+            return;
+          }
+        }
       } else {
         if (count !== null) setTotalCount(count);
 
@@ -425,7 +482,7 @@ export default function CampaignsPage() {
                               {campaign.end_date ? formatDate(campaign.end_date) : '∞'}
                             </td>
                             <td className="px-4 py-4 text-sm text-gray-600">
-                              {campaign.organization_name || 'Rumah Anak Surga'}
+                              {campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Rumah Anak Surga'}
                             </td>
                             <td className="px-4 py-4">
                               <div className="flex items-center gap-2">

@@ -84,7 +84,7 @@ export default function CampaignCard({ campaign, onClick }: CampaignCardProps) {
         <div>
           <div className="flex items-center gap-1.5 mb-1 flex-wrap">
             <span className="text-xs text-gray-700 truncate">
-              {campaign.organization_name || 'Donasiku'}
+              {campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Donasiku'}
             </span>
             {campaign.is_verified && (
               <CheckCircle className="w-3 h-3 text-white flex-shrink-0" style={{ fill: primaryColor }} />

@@ -20,10 +20,7 @@ import {
   Clock,
   Globe,
   Smartphone,
-  Type,
-  RefreshCw,
-  MessageCircle,
-  Copy
+  Type
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -238,7 +235,10 @@ export default function SettingsPage() {
     s3_public_url: '',
     s3_api_endpoint: '',
     created_at: '',
-    updated_at: ''
+    updated_at: '',
+    google_analytics_id: '',
+    facebook_pixel_id: '',
+    tiktok_pixel_id: ''
   });
 
   // Font Settings State
@@ -809,23 +809,21 @@ export default function SettingsPage() {
                 ) : (
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+                    className={`border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all ${uploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}
                   >
                     {uploadingLogo ? (
-                      <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="w-6 h-6 animate-spin" style={{ color: primaryColor }} />
-                        <span className="text-sm text-gray-600">Mengupload...</span>
-                      </div>
+                      <Loader2 className="w-8 h-8 text-gray-400 animate-spin mb-2" />
                     ) : (
-                      <div className="flex flex-col items-center gap-2">
-                        <ImageIcon className="w-8 h-8 text-gray-400" />
-                        <span className="text-sm text-gray-600">Klik untuk upload logo</span>
-                        <span className="text-xs text-gray-500">PNG, JPG maks. 5MB</span>
-                      </div>
+                      <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
                     )}
+                    <span className="text-sm text-gray-500">
+                      {uploadingLogo ? 'Mengupload...' : 'Klik untuk upload logo'}
+                    </span>
                   </div>
                 )}
-                <p className="text-xs text-gray-500 mt-1">Logo akan ditampilkan di sidebar dan header aplikasi</p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Format: PNG, JPG (Max 5MB)
+                </p>
               </div>
             </div>
 
@@ -862,6 +860,81 @@ export default function SettingsPage() {
             <CardSaveButton
               isSaving={savingSection === 'app_identity'}
               onClick={() => handleSave('app_identity')}
+              primaryColor={primaryColor}
+            />
+          </div>
+
+          {/* Analytics Settings */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Cloud className="w-5 h-5 text-purple-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-800">Analytics Tracking</h3>
+            </div>
+
+            <div className="space-y-4">
+              {/* Google Analytics */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Google Analytics Measurement ID (G-XXXXXXXXXX)
+                </label>
+                <input
+                  type="text"
+                  value={settings.google_analytics_id || ''}
+                  onChange={(e) => setSettings(prev => ({ ...prev, google_analytics_id: e.target.value }))}
+                  placeholder="G-ABC1234567"
+                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 font-mono text-sm"
+                />
+              </div>
+
+              {/* Facebook Pixel */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Facebook Pixel ID
+                </label>
+                <input
+                  type="text"
+                  value={settings.facebook_pixel_id || ''}
+                  onChange={(e) => setSettings(prev => ({ ...prev, facebook_pixel_id: e.target.value }))}
+                  placeholder="123456789012345"
+                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 font-mono text-sm"
+                />
+              </div>
+
+              {/* TikTok Pixel */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  TikTok Pixel ID
+                </label>
+                <input
+                  type="text"
+                  value={settings.tiktok_pixel_id || ''}
+                  onChange={(e) => setSettings(prev => ({ ...prev, tiktok_pixel_id: e.target.value }))}
+                  placeholder="C123ABC456DEF789"
+                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 font-mono text-sm"
+                />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-2">
+                <div className="flex gap-3">
+                  <div className="mt-0.5">
+                    <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-blue-800 mb-1">Cara Kerja Tracking</h4>
+                    <p className="text-sm text-blue-700 leading-relaxed">
+                      Sistem akan otomatis menyuntikkan script tracking yang valid ke halaman website.
+                      Event "Purchase" atau "Donate" akan dikirimkan otomatis saat transaksi berhasil.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <CardSaveButton
+              isSaving={savingSection === 'analytics'}
+              onClick={() => handleSave('analytics')}
               primaryColor={primaryColor}
             />
           </div>

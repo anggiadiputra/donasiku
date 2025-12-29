@@ -91,6 +91,13 @@ export default function DonationForm() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
 
+  // Validation state
+  const [isValidatingPhone, setIsValidatingPhone] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [isPhoneValid, setIsPhoneValid] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [isEmailValid, setIsEmailValid] = useState(false);
+
   // Use campaign's preset amounts if available, otherwise use defaults
   const donationAmounts = useMemo(() => {
     // Hide presets for Fidyah and Infaq pages
@@ -228,6 +235,66 @@ export default function DonationForm() {
     }
   };
 
+
+
+  // Validate phone on blur
+  const validatePhone = async () => {
+    if (!phone) return;
+
+    // Basic regex check first
+    const basicRegex = /^(\+62|62|0)8[1-9][0-9]{6,9}$/;
+    if (!basicRegex.test(phone.replace(/\D/g, ''))) {
+      setPhoneError('Format nomor tidak valid (contoh: 08123456789)');
+      setIsPhoneValid(false);
+      return;
+    }
+
+    try {
+      setIsValidatingPhone(true);
+      setPhoneError(null);
+
+      const { data, error } = await supabase.functions.invoke('validate-whatsapp', {
+        body: { phone }
+      });
+
+      if (error) throw error;
+
+      if (data && data.valid) {
+        setIsPhoneValid(true);
+        setPhoneError(null);
+      } else {
+        setIsPhoneValid(false);
+        setPhoneError(data.message || 'Nomor tidak terdaftar di WhatsApp');
+      }
+    } catch (error) {
+      console.error('Validation error:', error);
+      // Fallback: allow if validation fails due to network/server but has correct format
+      // To be safe, we might mostly warn or block specific errors.
+      // For now, let's treat generic errors as warnings but allow basic format?
+      // Actually user requested validation, so let's show error but maybe allow proceed with warning if critical?
+      // Sticking to blocking invalid for now as requested "di validasi".
+      setPhoneError('Gagal memvalidasi nomor. Pastikan koneksi internet lancar.');
+      setIsPhoneValid(false);
+    } finally {
+      setIsValidatingPhone(false);
+    }
+  };
+
+  // Validate email on blur
+  const validateEmail = () => {
+    if (!email) return;
+
+    // Strict email regex
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      setEmailError('Format email tidak valid (contoh: nama@email.com)');
+      setIsEmailValid(false);
+    } else {
+      setEmailError(null);
+      setIsEmailValid(true);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -259,6 +326,14 @@ export default function DonationForm() {
       return;
     }
 
+    // Check phone validation
+    if (!isPhoneValid && !isValidatingPhone) {
+      // Re-validate if not valid
+      toast.error('Nomor WhatsApp belum tervalidasi atau tidak valid');
+      validatePhone();
+      return;
+    }
+
     if (messageRequired && !message) {
       toast.error('Silakan isi niat berinfak');
       return;
@@ -266,6 +341,12 @@ export default function DonationForm() {
 
     if (!email || !email.trim()) {
       toast.error('Silakan isi alamat email');
+      return;
+    }
+
+    if (!isEmailValid) {
+      toast.error('Format email tidak valid');
+      validateEmail();
       return;
     }
 
@@ -281,9 +362,6 @@ export default function DonationForm() {
 
       const anonymousName = (isFidyahPage || isInfaqPage) ? 'Hamba Allah' : 'Orang Baik';
 
-
-
-
       // Custom product details for Fidyah
       const numberOfDays = (location.state as any)?.numberOfDays || 1;
       const productDetails = isFidyahPage
@@ -293,7 +371,7 @@ export default function DonationForm() {
           : undefined;
 
       // Determine campaign ID or Slug
-      let finalCampaignId = displayCampaign.id;
+      let finalCampaignId: string | undefined = displayCampaign.id;
       let finalCampaignSlug = undefined;
 
       // If we are strictly on a system page (Infaq/Fidyah) and the 'displayCampaign' logic
@@ -329,11 +407,9 @@ export default function DonationForm() {
           customerPhone: phone,
           customerMessage: message || '',
           returnUrl: `${window.location.origin}/payment/success`,
-          productDetails: productDetails,
+          productDetails: productDetails || '',
         },
       });
-
-
 
       if (transactionError) {
         console.error('❌ Transaction Error:', transactionError);
@@ -341,7 +417,57 @@ export default function DonationForm() {
       }
 
       if (transaction && transaction.transaction) {
+        // Track Analytics
+        try {
+          const trackingData = {
+            transaction_id: transaction.transaction.invoiceCode,
+            value: amount,
+            currency: 'IDR',
+            item_id: displayCampaign.id,
+            item_name: displayCampaign.title
+          };
 
+          // 1. Google Analytics
+          if (typeof window.gtag === 'function') {
+            window.gtag('event', 'purchase', {
+              transaction_id: trackingData.transaction_id,
+              value: trackingData.value,
+              currency: trackingData.currency,
+              items: [{
+                item_id: trackingData.item_id,
+                item_name: trackingData.item_name,
+                price: trackingData.value,
+                quantity: 1
+              }]
+            });
+          }
+
+          // 2. Facebook Pixel
+          if (typeof window.fbq === 'function') {
+            window.fbq('track', 'Purchase', {
+              value: trackingData.value,
+              currency: trackingData.currency,
+              content_ids: [trackingData.item_id],
+              content_type: 'product',
+              content_name: trackingData.item_name
+            });
+          }
+
+          // 3. TikTok Pixel
+          if (typeof window.ttq === 'object') {
+            window.ttq.track('CompletePayment', {
+              content_id: trackingData.item_id,
+              content_type: 'product',
+              content_name: trackingData.item_name,
+              quantity: 1,
+              price: trackingData.value,
+              value: trackingData.value,
+              currency: trackingData.currency
+            });
+          }
+        } catch (e) {
+          console.error('Analytics Tracking Error:', e);
+        }
 
         // Navigate to invoice page with transaction data
         navigate(`/invoice/${transaction.transaction.invoiceCode}`, {
@@ -574,31 +700,73 @@ export default function DonationForm() {
                 </button>
               </div>
 
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="No Whatsapp atau Handphone"
-                required
-                disabled={isProcessing}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none mb-4 disabled:opacity-50"
-                style={{ '--focus-border': primaryColor } as React.CSSProperties}
-                onFocus={(e) => e.target.style.borderColor = primaryColor}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-              />
+              <div className="relative mb-4">
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value.replace(/\D/g, ''));
+                    setPhoneError(null);
+                    setIsPhoneValid(false);
+                  }}
+                  onFocus={(e) => {
+                    if (!phoneError) e.target.style.borderColor = primaryColor;
+                  }}
+                  onBlur={(e) => {
+                    if (!phoneError) e.target.style.borderColor = '#e5e7eb';
+                    validatePhone();
+                  }}
+                  placeholder="No Whatsapp (08xxx)"
+                  required
+                  disabled={isProcessing || isValidatingPhone}
+                  className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none disabled:opacity-50 ${phoneError ? 'border-red-500' : 'border-gray-200'}`}
+                />
+                {isValidatingPhone && (
+                  <div className="absolute right-3 top-3.5">
+                    <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                  </div>
+                )}
+                {!isValidatingPhone && isPhoneValid && phone && (
+                  <div className="absolute right-3 top-3.5">
+                    <Check className="w-5 h-5 text-green-500" />
+                  </div>
+                )}
+                {phoneError && (
+                  <p className="text-red-500 text-xs mt-1">{phoneError}</p>
+                )}
+              </div>
 
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-                required
-                disabled={isProcessing}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none mb-4 disabled:opacity-50"
-                style={{ '--focus-border': primaryColor } as React.CSSProperties}
-                onFocus={(e) => e.target.style.borderColor = primaryColor}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-              />
+              <div className="relative mb-4">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setEmailError(null);
+                    setIsEmailValid(false);
+                  }}
+                  placeholder="Email"
+                  required
+                  disabled={isProcessing}
+                  className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none disabled:opacity-50 ${emailError ? 'border-red-500' : 'border-gray-200'}`}
+                  style={!emailError ? { '--focus-border': primaryColor } as React.CSSProperties : {}}
+                  onFocus={(e) => {
+                    if (!emailError) e.target.style.borderColor = primaryColor;
+                  }}
+                  onBlur={(e) => {
+                    if (!emailError) e.target.style.borderColor = '#e5e7eb';
+                    validateEmail();
+                  }}
+                />
+                {!emailError && isEmailValid && email && (
+                  <div className="absolute right-3 top-3.5">
+                    <Check className="w-5 h-5 text-green-500" />
+                  </div>
+                )}
+                {emailError && (
+                  <p className="text-red-500 text-xs mt-1">{emailError}</p>
+                )}
+              </div>
 
               <textarea
                 value={message}

@@ -26,7 +26,7 @@ export default function CampaignList({ onCampaignClick }: CampaignListProps) {
       // First, let's check if we can access campaigns at all
       const { data, error } = await supabase
         .from('campaigns')
-        .select('*')
+        .select('*, profiles:user_id(full_name, organization_name, avatar_url)')
         .eq('status', 'published')
         .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")')
         .order('created_at', { ascending: false })
@@ -41,11 +41,11 @@ export default function CampaignList({ onCampaignClick }: CampaignListProps) {
           hint: error.hint
         });
 
-        // If RLS policy issue, try without status filter to see all campaigns
-        if (error.code === '42501' || error.message.includes('permission') || error.message.includes('policy')) {
-          console.warn('RLS policy issue detected. Trying alternative query...');
+        // If RLS policy issue or Relationship issue, try alternative query
+        if (error.code === '42501' || error.code === 'PGRST200' || error.message.includes('permission') || error.message.includes('policy') || error.message.includes('relationship')) {
+          console.warn('Data fetching issue detected. Trying basic fallback query...');
 
-          // Try to fetch all campaigns (this will only work if user is authenticated)
+          // Try to fetch all campaigns without join (fallback)
           const { data: allData, error: allError } = await supabase
             .from('campaigns')
             .select('*')
