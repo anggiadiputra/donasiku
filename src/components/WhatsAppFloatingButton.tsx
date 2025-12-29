@@ -16,7 +16,7 @@ export default function WhatsAppFloatingButton() {
         // Fetch Admin WhatsApp Number
         const fetchSettings = async () => {
             try {
-                const { data, error } = await supabase
+                const { data } = await supabase
                     .from('app_settings')
                     .select('whatsapp_phone')
                     .limit(1)

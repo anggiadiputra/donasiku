@@ -226,29 +226,6 @@ export default function DonasiDashboardPage() {
         return <span className={`px-2 py-1 rounded text-xs font-semibold ${styles[key] || 'bg-gray-100'}`}>{labels[key] || status}</span>;
     };
 
-    const getPaymentMethodName = (code: string) => {
-        const map: Record<string, string> = {
-            'VC': 'Credit Card',
-            'BK': 'BCA KlikPay',
-            'BC': 'BCA Virtual Account',
-            'M1': 'Mandiri Virtual Account',
-            'B1': 'CIMB Niaga Virtual Account',
-            'I1': 'BNI Virtual Account',
-            'BT': 'Permata Virtual Account',
-            'A1': 'ATM Bersama',
-            'OV': 'OVO',
-            'DA': 'DANA',
-            'LA': 'LinkAja',
-            'SA': 'ShopeePay',
-            'QR': 'QRIS',
-            'LQ': 'LinkAja App',
-            'NQ': 'Nobu',
-            'BR': 'BRI Virtual Account',
-            'D1': 'Danamon Virtual Account',
-            'S1': 'Sampoerna Virtual Account',
-        };
-        return map[code] || code;
-    };
 
     const filteredTransactions = transactions.filter((tx) =>
         tx.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||

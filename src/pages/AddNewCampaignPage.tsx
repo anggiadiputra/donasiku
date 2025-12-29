@@ -36,9 +36,6 @@ export default function AddNewCampaignPage() {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [categoryId, setCategoryId] = useState<string>('');
   const [status, setStatus] = useState<'draft' | 'published'>('draft');
-  const [isUrgent, setIsUrgent] = useState(false);
-  const [organizationName, setOrganizationName] = useState('');
-  const [organizationLogo, setOrganizationLogo] = useState('');
 
   useEffect(() => {
     fetchCategories();
@@ -247,7 +244,7 @@ export default function AddNewCampaignPage() {
         current_amount: 0,
         category: getCategoryName(categoryId), // Store Name (Legacy)
         category_id: categoryId, // Store ID (Relation)
-        is_urgent: isUrgent,
+        is_urgent: false,
         is_verified: false, // Default to false
         status: publish ? 'published' : 'draft',
         user_id: user.id,
@@ -257,8 +254,8 @@ export default function AddNewCampaignPage() {
         form_type: formType,
         display_format: 'card',
         preset_amounts: presetAmountsNumeric,
-        organization_name: organizationName,
-        organization_logo: organizationLogo,
+        organization_name: '',
+        organization_logo: '',
         end_date: endDate ? new Date(endDate).toISOString() : null
       };
 
