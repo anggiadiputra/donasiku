@@ -53,8 +53,19 @@ export default function CampaignsPage() {
         // Exclude system campaigns
         .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 
+      const searchParams = new URLSearchParams(window.location.search);
+      const campaignerId = searchParams.get('campaigner_id');
+
       if (searchQuery) {
         query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+      }
+
+      if (campaignerId) {
+        if (campaignerId === 'null') {
+          query = query.is('user_id', null);
+        } else {
+          query = query.eq('user_id', campaignerId);
+        }
       }
 
       const from = (currentPage - 1) * entriesPerPage;
@@ -229,7 +240,7 @@ export default function CampaignsPage() {
 
       {/* Sidebar */}
       <div className={`
-        fixed md:static inset-y-0 left-0 z-50 w-64 bg-white transform transition-transform duration-200 ease-in-out md:transform-none
+        fixed md:sticky md:top-0 md:h-screen inset-y-0 left-0 z-50 w-64 bg-white transform transition-transform duration-200 ease-in-out md:transform-none
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
 `}>
         <Sidebar onClose={() => setSidebarOpen(false)} />

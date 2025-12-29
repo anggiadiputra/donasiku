@@ -234,7 +234,7 @@ export default function CampaignersPage() {
             )}
 
             {/* Sidebar */}
-            <div className={`fixed md:static inset-y-0 left-0 z-30 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            <div className={`fixed md:sticky md:top-0 md:h-screen inset-y-0 left-0 z-30 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
                 } md:translate-x-0`}>
                 <Sidebar onClose={() => setSidebarOpen(false)} />
             </div>
@@ -450,7 +450,7 @@ export default function CampaignersPage() {
                                                             <Edit2 className="w-4 h-4" />
                                                         </button>
                                                         <button
-                                                            onClick={() => navigate('/donasi/campaigns')}
+                                                            onClick={() => navigate(`/donasi/campaigns?campaigner_id=${campaigner.user_id === 'unknown' ? 'null' : campaigner.user_id}`)}
                                                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                                                             title="Lihat Campaigns"
                                                         >

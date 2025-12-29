@@ -112,7 +112,7 @@ interface SidebarProps {
 export default function Sidebar({ onClose }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { settings } = useAppSettings();
+  const { settings, loading } = useAppSettings();
   const primaryColor = usePrimaryColor();
   // Initialize with Donasi menu always expanded
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['/donasi/dashboard']);
@@ -141,6 +141,10 @@ export default function Sidebar({ onClose }: SidebarProps) {
     if (path === '/') {
       return location.pathname === '/';
     }
+    // Fix: Dashboard link should not be active when viewing Messages (which starts with /dashboard)
+    if (path === '/dashboard') {
+      return location.pathname === '/dashboard';
+    }
     return location.pathname.startsWith(path);
   };
 
@@ -166,35 +170,48 @@ export default function Sidebar({ onClose }: SidebarProps) {
       {/* Logo/App Name Header */}
       <div className="border-b-2 p-4 bg-white flex-shrink-0" style={{ borderColor: primaryColor }}>
         <div className="flex items-center gap-3">
-          {logoUrl ? (
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-white border-2 border-gray-200">
-              <img
-                src={logoUrl}
-                alt={appName}
-                className="w-full h-full object-contain p-1"
-                onError={(e) => {
-                  // Fallback to initial if image fails to load
-                  const target = e.target as HTMLImageElement;
-                  const parent = target.parentElement;
-                  if (parent) {
-                    parent.innerHTML = `<span class="text-white font-bold text-xl">${appInitial}</span>`;
-                    parent.className = "w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0";
-                    parent.setAttribute('style', `background-color: ${primaryColor}`);
-                  }
-                }}
-              />
-            </div>
+          {loading ? (
+            <>
+              {/* Skeleton Logo */}
+              <div className="w-12 h-12 rounded-lg bg-gray-200 animate-pulse flex-shrink-0"></div>
+              {/* Skeleton Name */}
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+              </div>
+            </>
           ) : (
-            <div
-              className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: primaryColor }}
-            >
-              <span className="text-white font-bold text-xl">{appInitial}</span>
-            </div>
+            <>
+              {logoUrl ? (
+                <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-white border-2 border-gray-200">
+                  <img
+                    src={logoUrl}
+                    alt={appName}
+                    className="w-full h-full object-contain p-1"
+                    onError={(e) => {
+                      // Fallback to initial if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      const parent = target.parentElement;
+                      if (parent) {
+                        parent.innerHTML = `<span class="text-white font-bold text-xl">${appInitial}</span>`;
+                        parent.className = "w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0";
+                        parent.setAttribute('style', `background-color: ${primaryColor}`);
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <div
+                  className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <span className="text-white font-bold text-xl">{appInitial}</span>
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-lg font-bold text-gray-800 truncate">{appName}</h1>
+              </div>
+            </>
           )}
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold text-gray-800 truncate">{appName}</h1>
-          </div>
         </div>
       </div>
 

@@ -40,7 +40,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </div>
 
       {/* Desktop Sidebar (Persistent) */}
-      <div className="hidden md:block bg-white border-r border-gray-200 fixed md:static inset-y-0 left-0 z-30 transition-all duration-300">
+      <div className="hidden md:block bg-white border-r border-gray-200 fixed md:sticky md:top-0 md:h-screen inset-y-0 left-0 z-30 transition-all duration-300">
         <Sidebar />
       </div>
 
