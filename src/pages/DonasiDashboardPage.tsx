@@ -8,6 +8,7 @@ import { useAppName } from '../hooks/useAppName';
 import { TableSkeleton } from '../components/SkeletonLoader';
 import ReceiptModal from '../components/ReceiptModal';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { useOrganization } from '../context/OrganizationContext';
 
 interface Transaction {
     id: string;
@@ -54,9 +55,23 @@ export default function DonasiDashboardPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [whatsappTemplate, setWhatsappTemplate] = useState('');
 
-    // Receipt Modal
     const [showReceiptModal, setShowReceiptModal] = useState(false);
     const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+    const [userProfile, setUserProfile] = useState<any>(null);
+
+    const { selectedOrganization } = useOrganization();
+
+    useEffect(() => {
+        fetchUserProfile();
+    }, []);
+
+    const fetchUserProfile = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+            setUserProfile({ ...user, ...data });
+        }
+    };
 
     // Stats
     const [stats, setStats] = useState({
@@ -67,8 +82,10 @@ export default function DonasiDashboardPage() {
     });
 
     useEffect(() => {
-        fetchData();
-    }, []);
+        if (userProfile) {
+            fetchData();
+        }
+    }, [userProfile, selectedOrganization?.id]);
 
     const appInitial = appName.charAt(0).toUpperCase();
 
@@ -84,22 +101,49 @@ export default function DonasiDashboardPage() {
 
     const fetchData = async () => {
         try {
+            if (!userProfile) return;
             setLoading(true);
 
-            // Fetch transactions
-            const { data: txData, error: txError } = await supabase
+            const isAdmin = userProfile.role === 'admin';
+
+            // 1. Fetch transactions
+            // Logic:
+            // Admin: All (unless Org selected)
+            // Org: Filter by org
+            // Personal: Filter by user_id
+            let txQuery = supabase
                 .from('transactions')
-                .select('*')
+                .select(isAdmin ? '*, campaigns(title, organization_id, user_id)' : '*, campaigns!inner(title, user_id, organization_id)')
                 .order('created_at', { ascending: false });
+
+            if (selectedOrganization) {
+                txQuery = txQuery.eq('campaigns.organization_id', selectedOrganization.id);
+            } else {
+                if (!isAdmin) {
+                    txQuery = txQuery.eq('campaigns.user_id', userProfile.id);
+                }
+            }
+
+            const { data: txData, error: txError } = await txQuery;
 
             if (txError) {
                 console.error('❌ Error fetching transactions:', txError);
             }
 
-            // Fetch campaigns
-            const { data: campData, error: campError } = await supabase
+            // 2. Fetch campaigns
+            let campQuery = supabase
                 .from('campaigns')
-                .select('id, title, slug, target_amount, current_amount');
+                .select('id, title, slug, target_amount, current_amount, user_id, organization_id');
+
+            if (selectedOrganization) {
+                campQuery = campQuery.eq('organization_id', selectedOrganization.id);
+            } else {
+                if (!isAdmin) {
+                    campQuery = campQuery.eq('user_id', userProfile.id);
+                }
+            }
+
+            const { data: campData, error: campError } = await campQuery;
 
             if (campError) {
                 console.error('❌ Error fetching campaigns:', campError);

@@ -2,7 +2,7 @@
 import { useState, useRef } from 'react';
 import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { uploadToS3ViaAPI } from '../utils/s3Storage';
+import { uploadToS3ViaAPI, deleteFromS3 } from '../utils/s3Storage';
 
 interface ImageUploadProps {
     value?: string;
@@ -38,6 +38,13 @@ export default function ImageUpload({
 
         try {
             setUploading(true);
+
+            // Delete old file if exists
+            if (value) {
+                console.log('[ImageUpload] Replacing image, deleting old one:', value);
+                await deleteFromS3(value);
+            }
+
             const url = await uploadToS3ViaAPI(file, folder);
             if (url) {
                 onChange(url);
@@ -88,7 +95,12 @@ export default function ImageUpload({
                             </button>
                             <button
                                 type="button"
-                                onClick={() => onChange('')}
+                                onClick={async () => {
+                                    if (value) {
+                                        await deleteFromS3(value);
+                                    }
+                                    onChange('');
+                                }}
                                 disabled={uploading}
                                 className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
                                 title="Hapus Gambar"

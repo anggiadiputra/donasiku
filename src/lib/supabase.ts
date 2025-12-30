@@ -39,6 +39,7 @@ export interface Campaign {
   campaign_type?: string;
   preset_amounts?: number[];
   status?: 'draft' | 'published';
+  is_featured?: boolean;
   created_at: string;
   updated_at: string;
   profiles?: {
@@ -110,6 +111,8 @@ export interface AppSettings {
   google_analytics_id?: string;
   facebook_pixel_id?: string;
   tiktok_pixel_id?: string;
+  allow_registration?: boolean;
+  registration_message?: string;
   created_at: string;
   updated_at: string;
 }

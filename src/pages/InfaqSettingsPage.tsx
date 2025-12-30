@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useOrganization } from '../context/OrganizationContext';
 import {
   Heart,
   Loader2,
   Save,
   Plus,
-  Trash2,
-  ChevronLeft,
-  Info
+  Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DashboardLayout from '../components/DashboardLayout';
@@ -16,6 +16,8 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { SettingsPageSkeleton } from '../components/SkeletonLoader';
 
 export default function InfaqSettingsPage() {
+  const navigate = useNavigate();
+  const { selectedOrganization } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -35,8 +37,13 @@ export default function InfaqSettingsPage() {
   });
 
   useEffect(() => {
+    if (selectedOrganization) {
+      toast.error('Akses Terbatas: Pengaturan infaq hanya dapat diakses melalui Akun Personal');
+      navigate('/dashboard');
+      return;
+    }
     fetchSettings();
-  }, []);
+  }, [selectedOrganization, navigate]);
 
   usePageTitle('Pengaturan Infaq');
 

@@ -10,7 +10,7 @@ import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { CampaignPageSkeleton } from '../components/SkeletonLoader';
 import { useAppName } from '../hooks/useAppName';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { isNetworkError, isDatabaseRelationshipError } from '../utils/errorHandling';
+import { isNetworkError } from '../utils/errorHandling';
 
 export default function CampaignPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -66,7 +66,14 @@ export default function CampaignPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from('campaigns')
-        .select('*')
+        .select(`
+          *,
+          organizations (
+            name,
+            logo_url,
+            slug
+          )
+        `)
         .eq('slug', campaignSlug)
         .single();
 
@@ -105,7 +112,11 @@ export default function CampaignPage() {
               .single();
 
             if (profile) {
-              data.organization_name = profile.organization_name || data.organization_name;
+              // Only override if not already provided by organizations join
+              // @ts-ignore
+              if (!data.organizations) {
+                data.organization_name = profile.organization_name || data.organization_name;
+              }
             }
           }
 
@@ -400,16 +411,28 @@ export default function CampaignPage() {
           {/* Informasi Penggalangan Dana */}
           <div className="px-5 py-6 border-b border-gray-100">
             <h3 className="font-bold text-gray-800 mb-3">Informasi Penggalangan Dana</h3>
-            <div className="border border-gray-200 rounded-xl p-4">
+            <div
+              className="border border-gray-200 rounded-xl p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={() => {
+                // @ts-ignore
+                const orgSlug = campaign.organizations?.slug;
+                if (orgSlug) {
+                  navigate(`/org/${orgSlug}`);
+                }
+              }}
+            >
               <p className="text-sm font-semibold text-gray-700 mb-3">Penggalang Dana</p>
               <div className="flex items-center gap-3">
                 {/* Logo */}
                 <div className="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {campaign.organization_logo ? (
-                    <img src={campaign.organization_logo} alt="Org" className="w-full h-full object-cover" />
+                  {/* @ts-ignore */}
+                  {(campaign.organizations?.logo_url || campaign.organization_logo) ? (
+                    /* @ts-ignore */
+                    <img src={campaign.organizations?.logo_url || campaign.organization_logo} alt="Org" className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-pink-500 font-bold text-lg">
-                      {(campaign.organization_name || appName || 'D').charAt(0)}
+                      {/* @ts-ignore */}
+                      {(campaign.organizations?.name || campaign.organization_name || appName || 'D').charAt(0)}
                     </span>
                   )}
                 </div>
@@ -418,7 +441,8 @@ export default function CampaignPage() {
                 <div>
                   <div className="flex items-center gap-1">
                     <span className="font-bold text-gray-900 text-sm">
-                      {campaign.profiles?.organization_name || campaign.organization_name || appName || 'Donasiku'}
+                      {/* @ts-ignore */}
+                      {campaign.organizations?.name || campaign.profiles?.organization_name || campaign.organization_name || appName || 'Donasiku'}
                     </span>
                     {/* Verified Badge */}
                     <svg className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="none">

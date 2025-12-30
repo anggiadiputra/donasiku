@@ -8,10 +8,13 @@ import { TableSkeleton } from '../components/SkeletonLoader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { isNetworkError } from '../utils/errorHandling';
 
+import { useOrganization } from '../context/OrganizationContext';
+
 export default function DonatursPage() {
     usePageTitle('Data Donatur');
     const navigate = useNavigate();
     const { appName } = useAppName();
+    const { selectedOrganization } = useOrganization();
     const [donors, setDonors] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -26,18 +29,32 @@ export default function DonatursPage() {
 
     useEffect(() => {
         fetchDonors();
-    }, []);
+    }, [selectedOrganization?.id]);
 
     const fetchDonors = async (retryCount = 0) => {
         try {
             setLoading(true);
 
-            // Fetch all successful transactions
-            const { data: transactions, error } = await supabase
+            // Fetch successful transactions
+            let query = supabase
                 .from('transactions')
-                .select('customer_name, customer_phone, customer_email, amount, created_at, campaign_id, status')
-                .eq('status', 'success')
-                .order('created_at', { ascending: false });
+                .select('customer_name, customer_phone, customer_email, amount, created_at, campaign_id, status, campaigns!inner(user_id, organization_id)')
+                .eq('status', 'success');
+
+            if (selectedOrganization) {
+                query = query.eq('campaigns.organization_id', selectedOrganization.id);
+            } else {
+                // Personal context logic
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+                    if (profile?.role !== 'admin') {
+                        query = query.eq('campaigns.user_id', user.id);
+                    }
+                }
+            }
+
+            const { data: transactions, error } = await query.order('created_at', { ascending: false });
 
             if (error) {
                 console.error('Error fetching donors:', error);

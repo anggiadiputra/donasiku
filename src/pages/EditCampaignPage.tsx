@@ -6,7 +6,8 @@ import {
   Upload,
   Calendar,
   Save,
-  Send
+  Send,
+  Flame
 } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { supabase, Category, Campaign } from '../lib/supabase';
@@ -38,6 +39,7 @@ export default function EditCampaignPage() {
   const [presetAmounts, setPresetAmounts] = useState<string[]>(['', '', '', '', '']);
   const [categoryId, setCategoryId] = useState<string>('');
   const [status, setStatus] = useState<'draft' | 'published'>('draft');
+  const [isFeatured, setIsFeatured] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [showAddCategory, setShowAddCategory] = useState(false);
 
@@ -133,12 +135,14 @@ export default function EditCampaignPage() {
         return;
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('campaigns')
         .select('*')
-        .eq('id', campaignId)
-        .eq('user_id', user.id)
-        .single();
+        .eq('id', campaignId);
+
+      // If we are in an organization context, we don't strictly require user_id match
+      // RLS will handle the permissions.
+      const { data, error } = await query.single();
 
       if (error) {
         console.error('Error fetching campaign:', error);
@@ -164,6 +168,7 @@ export default function EditCampaignPage() {
         setFormType(data.form_type || 'donation');
         setCategoryId(data.category_id || '');
         setStatus(data.status || 'draft');
+        setIsFeatured(!!data.is_featured);
 
         // Set preset amounts
         if (data.preset_amounts && Array.isArray(data.preset_amounts)) {
@@ -326,10 +331,10 @@ export default function EditCampaignPage() {
           display_format: 'card',
           preset_amounts: presetAmountsNumeric,
           status: publish ? 'published' : status,
+          is_featured: isFeatured,
           end_date: endDate || null,
         })
-        .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('id', id);
 
       if (error) {
         console.error('Error updating campaign:', error);
@@ -605,90 +610,113 @@ export default function EditCampaignPage() {
               </div>
             </div>
 
-            {/* Publish Section */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Publish</h3>
+            {/* Featured Option */}
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={isFeatured}
+                    onChange={(e) => setIsFeatured(e.target.checked)}
+                    className="peer sr-only"
+                  />
+                  <div className="w-10 h-6 bg-gray-200 rounded-full peer-checked:bg-orange-500 transition-colors" />
+                  <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                    Jadikan Program Unggulan
+                    <Flame className="w-3.5 h-3.5 text-orange-500 fill-current" />
+                  </span>
+                  <span className="text-xs text-gray-500">Tampilkan di posisi teratas rekomendasi (Maks 3)</span>
+                </div>
+              </label>
+            </div>
+          </div>
 
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">Category</label>
+          {/* Publish Section */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Publish</h3>
+
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">Category</label>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCategory(!showAddCategory)}
+                  className="text-xs text-orange-500 hover:text-orange-600 font-semibold"
+                >
+                  {showAddCategory ? 'Batal' : '+ Tambah Kategori'}
+                </button>
+              </div>
+
+              {showAddCategory ? (
+                <div className="space-y-2 mb-2">
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="Nama kategori baru"
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddCategory();
+                      }
+                    }}
+                  />
                   <button
                     type="button"
-                    onClick={() => setShowAddCategory(!showAddCategory)}
-                    className="text-xs text-orange-500 hover:text-orange-600 font-semibold"
+                    onClick={handleAddCategory}
+                    className="w-full px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors"
                   >
-                    {showAddCategory ? 'Batal' : '+ Tambah Kategori'}
+                    Tambahkan Kategori
                   </button>
                 </div>
+              ) : null}
 
-                {showAddCategory ? (
-                  <div className="space-y-2 mb-2">
-                    <input
-                      type="text"
-                      value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
-                      placeholder="Nama kategori baru"
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          handleAddCategory();
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddCategory}
-                      className="w-full px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors"
-                    >
-                      Tambahkan Kategori
-                    </button>
-                  </div>
-                ) : null}
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
+              >
+                <option value="">Uncategorized</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
-                >
-                  <option value="">Uncategorized</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as 'draft' | 'published')}
+                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 capitalize"
+              >
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </select>
+            </div>
 
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as 'draft' | 'published')}
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 capitalize"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                </select>
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  onClick={() => handleSave(false)}
-                  disabled={loading}
-                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <Save className="w-4 h-4" />
-                  {status === 'published' ? 'Update Campaign' : 'Save to Draft'}
-                </button>
-                <button
-                  onClick={() => handleSave(true)}
-                  disabled={loading}
-                  className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <Send className="w-4 h-4" />
-                  {status === 'published' ? 'Update & Keep Published' : 'Publish'}
-                </button>
-              </div>
+            <div className="space-y-3">
+              <button
+                onClick={() => handleSave(false)}
+                disabled={loading}
+                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                {status === 'published' ? 'Update Campaign' : 'Save to Draft'}
+              </button>
+              <button
+                onClick={() => handleSave(true)}
+                disabled={loading}
+                className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" />
+                {status === 'published' ? 'Update & Keep Published' : 'Publish'}
+              </button>
             </div>
           </div>
         </div>

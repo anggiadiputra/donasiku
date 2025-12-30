@@ -5,7 +5,6 @@ import { supabase, Campaign } from '../lib/supabase';
 import CampaignCard from './CampaignCard';
 import { createSlug } from '../utils/slug';
 import { CampaignListSkeleton } from './SkeletonLoader';
-import { isNetworkError, isDatabaseRelationshipError } from '../utils/errorHandling';
 
 interface CampaignListProps {
   onCampaignClick?: (campaign: Campaign) => void;
@@ -24,52 +23,45 @@ export default function CampaignList({ onCampaignClick }: CampaignListProps) {
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
+      // 1. Fetch Featured Campaigns (max 3)
+      const { data: featuredData, error: featuredError } = await supabase
         .from('campaigns')
-        .select('*, profiles:user_id(full_name, organization_name, avatar_url)')
+        .select('*, profiles:user_id(full_name, organization_name, avatar_url), organizations(name, logo_url)')
         .eq('status', 'published')
+        .eq('is_featured', true)
         .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")')
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(3);
 
-      if (error) {
-        console.error('Campaign fetching error:', error);
+      if (featuredError) throw featuredError;
 
-        // 1. Handle Network Errors with limited retry
-        if (isNetworkError(error) && retryCount < 2) {
-          console.warn(`Network issue, retrying (${retryCount + 1})...`);
-          setTimeout(() => fetchCampaigns(retryCount + 1), 2000);
-          return;
-        }
+      const featured = featuredData || [];
+      const featuredIds = featured.map(c => c.id);
 
-        // 2. Handle Relationship/Permission Errors with Fallback
-        if (isDatabaseRelationshipError(error) || isNetworkError(error)) {
-          console.warn('Attempting fallback query due to fetching issue...');
+      // 2. Fetch Latest Campaigns to fill the rest (total 5)
+      const { data: latestData, error: latestError } = await supabase
+        .from('campaigns')
+        .select('*, profiles:user_id(full_name, organization_name, avatar_url), organizations(name, logo_url)')
+        .eq('status', 'published')
+        .not('id', 'in', `(${featuredIds.length > 0 ? featuredIds.map(id => `"${id}"`).join(',') : '"00000000-0000-0000-0000-000000000000"'})`)
+        .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")')
+        .order('created_at', { ascending: false })
+        .limit(5 - featured.length);
 
-          const { data: allData, error: allError } = await supabase
-            .from('campaigns')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(10);
+      if (latestError) throw latestError;
 
-          if (!allError && allData) {
-            setCampaigns(allData.filter(c => c.status === 'published' && !["infaq", "fidyah", "zakat", "wakaf", "sedekah-subuh", "kemanusiaan"].includes(c.slug || '')));
-            return;
-          }
-        }
-
-        setCampaigns([]);
-      } else {
-        setCampaigns(data || []);
-      }
+      setCampaigns([...featured, ...(latestData || [])]);
     } catch (err: any) {
       console.error('Unexpected error:', err);
-      // Handle generic fetch/TypeError
-      if (isNetworkError(err) && retryCount < 2) {
-        setTimeout(() => fetchCampaigns(retryCount + 1), 2000);
-        return;
-      }
-      setCampaigns([]);
+      // Simple fallback
+      const { data: fallbackData } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (fallbackData) setCampaigns(fallbackData);
     } finally {
       if (retryCount === 0 || !loading) {
         setLoading(false);

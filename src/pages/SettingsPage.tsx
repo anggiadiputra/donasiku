@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useOrganization } from '../context/OrganizationContext';
 import {
   Settings as SettingsIcon,
   CreditCard,
@@ -20,7 +22,8 @@ import {
   Clock,
   Globe,
   Smartphone,
-  Type
+  Type,
+  Users
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -42,7 +45,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import DashboardLayout from '../components/DashboardLayout';
 import { supabase, AppSettings } from '../lib/supabase';
-import { uploadToS3ViaAPI } from '../utils/s3Storage';
+import { uploadToS3, uploadToS3ViaAPI, deleteFromS3 } from '../utils/s3Storage';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { SettingsPageSkeleton } from '../components/SkeletonLoader';
@@ -199,6 +202,8 @@ function SortablePaymentMethod({ method, onToggle }: SortablePaymentMethodProps)
 }
 
 export default function SettingsPage() {
+  const navigate = useNavigate();
+  const { selectedOrganization } = useOrganization();
   const primaryColor = usePrimaryColor();
   const [loading, setLoading] = useState(true);
   const [savingSection, setSavingSection] = useState<string | null>(null);
@@ -240,7 +245,9 @@ export default function SettingsPage() {
     updated_at: '',
     google_analytics_id: '',
     facebook_pixel_id: '',
-    tiktok_pixel_id: ''
+    tiktok_pixel_id: '',
+    allow_registration: true, // Default true
+    registration_message: ''
   });
 
   // Font Settings State
@@ -265,6 +272,11 @@ export default function SettingsPage() {
   const FONT_WEIGHTS = [300, 400, 500, 600, 700];
 
   useEffect(() => {
+    if (selectedOrganization) {
+      toast.error('Akses Terbatas: Pengaturan aplikasi hanya dapat diakses melalui Akun Personal');
+      navigate('/dashboard');
+      return;
+    }
     fetchSettings();
     fetchPaymentMethods();
     // Load font settings from localStorage
@@ -274,8 +286,8 @@ export default function SettingsPage() {
         const parsed = JSON.parse(savedFontSettings);
         setFontSettings(parsed);
         applyFontSettings(parsed);
-      } catch (error) {
-        console.error('Error loading font settings:', error);
+      } catch (error: any) {
+        console.error('Error fetching one-time secret:', error);
       }
     }
   }, []);
@@ -325,45 +337,52 @@ export default function SettingsPage() {
   const fetchSettings = async (retryCount = 0) => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+
+      const { data: publicData, error: publicError } = await supabase
         .from('app_settings')
         .select('*')
         .limit(1)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching settings:', error);
+      const { data: secretData, error: secretError } = await supabase
+        .from('app_secrets')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
 
-        // Handle Network Errors
-        if (isNetworkError(error) && retryCount < 2) {
-          console.warn(`Settings fetch network issue, retrying (${retryCount + 1})...`);
-          setTimeout(() => fetchSettings(retryCount + 1), 2000);
-          return;
-        }
+      if (publicError && publicError.code !== 'PGRST116') {
+        processSettingsError(publicError, retryCount);
       }
 
-      if (data) {
+      if (secretError && secretError.code !== 'PGRST116') {
+        console.error('Error fetching app secrets:', secretError);
+      }
+
+      if (publicData) {
         setSettings({
-          ...data,
-          payment_methods: Array.isArray(data.payment_methods)
-            ? data.payment_methods
-            : JSON.parse(data.payment_methods || '[]')
+          ...publicData,
+          ...(secretData || {}),
+          payment_methods: Array.isArray(publicData.payment_methods)
+            ? publicData.payment_methods
+            : JSON.parse(publicData.payment_methods || '[]')
         });
         // Apply primary color from database
-        if (data.primary_color) {
-          applyPrimaryColor(data.primary_color);
+        if (publicData.primary_color) {
+          applyPrimaryColor(publicData.primary_color);
         }
       }
     } catch (err: any) {
-      console.error('Unexpected Settings error:', err);
-      if (isNetworkError(err) && retryCount < 2) {
-        setTimeout(() => fetchSettings(retryCount + 1), 2000);
-        return;
-      }
+      processSettingsError(err, retryCount);
     } finally {
-      if (retryCount === 0 || !loading) {
-        setLoading(false);
-      }
+      setLoading(false);
+    }
+  };
+
+  const processSettingsError = (error: any, retryCount: number) => {
+    console.error('Error fetching settings:', error);
+    if (isNetworkError(error) && retryCount < 2) {
+      console.warn(`Settings fetch network issue, retrying (${retryCount + 1})...`);
+      setTimeout(() => fetchSettings(retryCount + 1), 2000);
     }
   };
 
@@ -482,9 +501,8 @@ export default function SettingsPage() {
         return; // Stop here, do not fallback
       }
 
-      // Upload to S3
-
-      const logoUrl = await uploadToS3ViaAPI(file, 'logos');
+      // Upload to S3 (this also handles auto-delete if settings.logo_url is provided)
+      const logoUrl = await uploadToS3(file, 'logos', settings.logo_url);
 
 
       if (logoUrl) {
@@ -547,13 +565,38 @@ export default function SettingsPage() {
     }
   };
 
-  const handleLogoRemove = () => {
+  const handleLogoRemove = async () => {
+    if (settings.logo_url) {
+      await deleteFromS3(settings.logo_url);
+    }
     setSettings(prev => ({ ...prev, logo_url: '' }));
   };
 
   const handleSave = async (section?: string) => {
     try {
       setSavingSection(section || 'global');
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Sesi Anda telah berakhir. Silakan login kembali.');
+      }
+
+      // Pre-check: Verify if user is admin
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+
+
+      if (profileError) {
+        throw new Error('Gagal memverifikasi role Anda: ' + profileError.message);
+      }
+
+      if (profile?.role !== 'admin') {
+        throw new Error(`Izin ditolak. Role Anda (${profile?.role}) bukan Admin.`);
+      }
 
       if (section === 'payment_methods') {
         const updates = paymentMethods.map((method, index) => ({
@@ -577,38 +620,80 @@ export default function SettingsPage() {
         return;
       }
 
-      const settingsToSave = {
-        ...settings,
-        payment_methods: settings.payment_methods
-      };
+      const publicColumns = [
+        'app_name', 'tagline', 'logo_url', 'primary_color', 'payment_methods',
+        'whatsapp_enabled', 'whatsapp_phone', 'whatsapp_template', 'whatsapp_success_template',
+        'allow_registration', 'registration_message',
+        'google_analytics_id', 'facebook_pixel_id', 'tiktok_pixel_id',
+        'email_template', 'email_enabled'
+      ];
 
-      // Check if settings exist
-      const { data: existing, error: fetchError } = await supabase
+      const settingsToSave: any = {};
+      const secretsToSave: any = {};
+
+      Object.keys(settings).forEach(key => {
+        if (publicColumns.includes(key)) {
+          settingsToSave[key] = (settings as any)[key];
+        } else if (!['id', 'created_at', 'updated_at'].includes(key)) {
+          // Only add to secrets if the field is defined
+          const val = (settings as any)[key];
+          if (val !== undefined) {
+            secretsToSave[key] = val;
+          }
+        }
+      });
+
+      console.log('Saving App Settings:', settingsToSave);
+
+      // 1. Update app_settings
+      const { data: existingApp, error: fetchAppError } = await supabase
         .from('app_settings')
         .select('id')
         .limit(1)
         .maybeSingle();
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        throw fetchError;
+      if (fetchAppError && fetchAppError.code !== 'PGRST116') throw fetchAppError;
+
+      if (existingApp?.id) {
+        const { error, count } = await supabase
+          .from('app_settings')
+          .update(settingsToSave, { count: 'exact' })
+          .eq('id', existingApp.id);
+
+        if (error) throw error;
+        if (count === 0) {
+          throw new Error('Gagal memperbarui: 0 baris berubah. Pastikan Anda memiliki izin Admin.');
+        }
+      } else {
+        const { error } = await supabase.from('app_settings').insert([settingsToSave]);
+        if (error) throw error;
       }
 
-      if (existing && existing.id) {
-        // Update existing
-        const { error } = await supabase
-          .from('app_settings')
-          .update(settingsToSave)
-          .eq('id', existing.id);
+      // 2. Update app_secrets (only if there are secrets to save)
+      if (Object.keys(secretsToSave).length > 0) {
+        console.log('Saving App Secrets:', Object.keys(secretsToSave));
+        const { data: existingSec, error: fetchSecError } = await supabase
+          .from('app_secrets')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
 
-        if (error) throw error;
-      } else {
-        // Insert new - remove id to let database generate it
-        const { id, ...settingsWithoutId } = settingsToSave;
-        const { error } = await supabase
-          .from('app_settings')
-          .insert([settingsWithoutId]);
+        if (fetchSecError && fetchSecError.code !== 'PGRST116') throw fetchSecError;
 
-        if (error) throw error;
+        if (existingSec?.id) {
+          const { error, count } = await supabase
+            .from('app_secrets')
+            .update(secretsToSave, { count: 'exact' })
+            .eq('id', existingSec.id);
+
+          if (error) throw error;
+          if (count === 0) {
+            console.warn('App secrets update: 0 rows affected (might be RLS restriction)');
+          }
+        } else {
+          const { error } = await supabase.from('app_secrets').insert([secretsToSave]);
+          if (error) throw error;
+        }
       }
 
       // Refresh settings after save
@@ -622,9 +707,9 @@ export default function SettingsPage() {
       toast.success('Pengaturan disimpan', {
         description: 'Seluruh konfigurasi aplikasi Anda telah berhasil diperbarui.'
       });
-    } catch (error: any) {
-      console.error('Error saving settings:', error);
-      toast.error('Gagal menyimpan pengaturan: ' + (error.message || 'Unknown error'));
+    } catch (err: any) {
+      console.error('Error saving settings:', err);
+      toast.error('Gagal menyimpan pengaturan: ' + (err.message || 'Unknown error'));
     } finally {
       setSavingSection(null);
     }
@@ -886,6 +971,55 @@ export default function SettingsPage() {
             <CardSaveButton
               isSaving={savingSection === 'app_identity'}
               onClick={() => handleSave('app_identity')}
+              primaryColor={primaryColor}
+            />
+          </div>
+
+          {/* User Registration Settings */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <Users className="w-5 h-5 text-indigo-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-800">Registrasi Pengguna</h3>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Izinkan Registrasi Publik</label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Jika dimatikan, hanya Admin yang bisa menambahkan user (via invite/manual).
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.allow_registration ?? true} // Default true if undefined
+                    onChange={(e) => setSettings(prev => ({ ...prev, allow_registration: e.target.checked }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+
+              {!settings.allow_registration && (
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 animate-in fade-in slide-in-from-top-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Pesan Penutupan Registrasi</label>
+                  <textarea
+                    value={settings.registration_message || ''}
+                    onChange={(e) => setSettings(prev => ({ ...prev, registration_message: e.target.value }))}
+                    placeholder="Mohon maaf, pendaftaran pengguna baru sedang ditutup untuk sementara waktu."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                  />
+                </div>
+              )}
+            </div>
+
+            <CardSaveButton
+              isSaving={savingSection === 'registration'}
+              onClick={() => handleSave('registration')}
               primaryColor={primaryColor}
             />
           </div>

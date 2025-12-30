@@ -82,7 +82,7 @@ export default function CampaignsListPage() {
 
       let query = supabase
         .from('campaigns')
-        .select('*, profiles:user_id(full_name, organization_name, avatar_url)')
+        .select('*, profiles:user_id(full_name, organization_name, avatar_url), organizations(name, logo_url)')
         .eq('status', 'published')
         .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 

@@ -1,5 +1,6 @@
-
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useOrganization } from '../context/OrganizationContext';
 import {
     Save,
     Loader2,
@@ -15,6 +16,8 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { SettingsPageSkeleton } from '../components/SkeletonLoader';
 
 export default function FidyahSettingsPage() {
+    const navigate = useNavigate();
+    const { selectedOrganization } = useOrganization();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -32,8 +35,13 @@ export default function FidyahSettingsPage() {
     });
 
     useEffect(() => {
+        if (selectedOrganization) {
+            toast.error('Akses Terbatas: Pengaturan fidyah hanya dapat diakses melalui Akun Personal');
+            navigate('/dashboard');
+            return;
+        }
         fetchData();
-    }, []);
+    }, [selectedOrganization, navigate]);
 
     usePageTitle('Pengaturan Fidyah');
 

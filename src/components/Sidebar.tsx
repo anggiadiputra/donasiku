@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { useAppSettings } from '../hooks/useAppSettings';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
+import { useOrganization } from '../context/OrganizationContext';
+import { Building2, User } from 'lucide-react';
 
 interface SubMenuItem {
   label: string;
@@ -114,6 +116,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const location = useLocation();
   const { settings, loading } = useAppSettings();
   const primaryColor = usePrimaryColor();
+  const { organizations, selectedOrganization, switchOrganization, canAccessPersonal } = useOrganization();
+  const [showOrgMenu, setShowOrgMenu] = useState(false);
   // Initialize with Donasi menu always expanded
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['/donasi/dashboard']);
 
@@ -122,9 +126,52 @@ export default function Sidebar({ onClose }: SidebarProps) {
   // Get first letter of app name for icon (fallback if no logo)
   const appInitial = appName.charAt(0).toUpperCase();
 
+  const [finalMenuItems, setFinalMenuItems] = useState<MenuItem[]>(menuItems);
+
+  useEffect(() => {
+    let items = [...menuItems];
+
+    if (selectedOrganization) {
+      // Filter out global settings when in organization mode
+      const globalSettingsPaths = [
+        '/settings',
+        '/zakat/settings',
+        '/infaq/settings',
+        '/fidyah/settings',
+        '/donasi/settings'
+      ];
+
+      items = items
+        .filter(i => !globalSettingsPaths.includes(i.path))
+        .map(i => ({
+          ...i,
+          subMenu: i.subMenu ? i.subMenu.filter(s => !globalSettingsPaths.includes(s.path)) : undefined
+        }));
+
+      // ONLY show Org Settings if the user is owner or admin
+      if (selectedOrganization.role === 'owner' || selectedOrganization.role === 'admin') {
+        const orgSettingsItem: MenuItem = {
+          label: 'Pengaturan Org',
+          icon: <Settings className="w-5 h-5" />,
+          path: '/organizations/settings'
+        };
+
+        // Find index of Dashboard
+        const dashboardIndex = items.findIndex(i => i.path === '/dashboard');
+        if (dashboardIndex !== -1) {
+          // Insert after Dashboard
+          items.splice(dashboardIndex + 1, 0, orgSettingsItem);
+        } else {
+          items.push(orgSettingsItem);
+        }
+      }
+    }
+    setFinalMenuItems(items);
+  }, [selectedOrganization]);
+
   // Auto-expand menu jika salah satu submenu aktif (kecuali Donasi yang sudah selalu expanded)
   useEffect(() => {
-    const activeMenu = menuItems.find(menu =>
+    const activeMenu = finalMenuItems.find(menu =>
       menu.subMenu?.some(sub => location.pathname.startsWith(sub.path))
     );
     if (activeMenu && activeMenu.path !== '/donasi/dashboard') {
@@ -135,7 +182,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
         return prev;
       });
     }
-  }, [location.pathname]);
+  }, [location.pathname, finalMenuItems]);
 
   const isActive = (path: string) => {
     if (path === '/') {
@@ -215,11 +262,91 @@ export default function Sidebar({ onClose }: SidebarProps) {
         </div>
       </div>
 
+      {/* Organization Switcher */}
+      <div className="px-4 py-3 border-b border-gray-100 relative">
+        <button
+          onClick={() => setShowOrgMenu(!showOrgMenu)}
+          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
+        >
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${selectedOrganization ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-600'}`}>
+            {selectedOrganization ? <Building2 className="w-4 h-4" /> : <User className="w-4 h-4" />}
+          </div>
+          <div className="flex-1 text-left min-w-0">
+            <p className="text-xs font-medium text-gray-500">Mode Akun</p>
+            <p className="text-sm font-bold text-gray-800 truncate">
+              {selectedOrganization ? selectedOrganization.name : 'Personal Account'}
+            </p>
+          </div>
+          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showOrgMenu ? 'rotate-180' : ''}`} />
+        </button>
+
+        {showOrgMenu && (
+          <div className="absolute top-full left-4 right-4 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
+            <div className="py-1">
+              {canAccessPersonal && (
+                <>
+                  <button
+                    onClick={() => {
+                      switchOrganization(null);
+                      setShowOrgMenu(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-50 ${!selectedOrganization ? 'bg-gray-50 font-semibold' : ''}`}
+                  >
+                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                      <User className="w-3 h-3" />
+                    </div>
+                    <span>Personal Account</span>
+                    {!selectedOrganization && <span className="ml-auto text-xs bg-gray-200 px-1.5 py-0.5 rounded">Aktif</span>}
+                  </button>
+                  {organizations.length > 0 && <div className="border-t border-gray-100 my-1"></div>}
+                </>
+              )}
+
+              {organizations.map(org => (
+                <button
+                  key={org.id}
+                  onClick={() => {
+                    switchOrganization(org.id);
+                    setShowOrgMenu(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-50 ${selectedOrganization?.id === org.id ? 'bg-orange-50 font-semibold' : ''}`}
+                >
+                  <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                    <Building2 className="w-3 h-3" />
+                  </div>
+                  <span className="truncate">{org.name}</span>
+                  {selectedOrganization?.id === org.id && <span className="ml-auto text-xs bg-orange-200 text-orange-800 px-1.5 py-0.5 rounded">Aktif</span>}
+                </button>
+              ))}
+
+              {canAccessPersonal && (
+                <>
+                  <div className="border-t border-gray-100 my-1"></div>
+                  <button
+                    onClick={() => {
+                      navigate('/organizations/new'); // Correct path
+                      setShowOrgMenu(false);
+                      onClose?.();
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 font-medium"
+                  >
+                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                      <span className="text-sm">+</span>
+                    </div>
+                    Buat Organisasi Baru
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Navigation Menu */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-4">
           <nav className="space-y-1">
-            {menuItems.map((item) => {
+            {finalMenuItems.map((item) => {
               const hasSubMenu = item.subMenu && item.subMenu.length > 0;
               const expanded = isExpanded(item.path);
               const isParentActive = hasSubMenu

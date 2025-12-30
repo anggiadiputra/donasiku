@@ -36,6 +36,7 @@ import CampaignPage from './pages/CampaignPage';
 import InvoicePage from './pages/InvoicePage';
 import PaymentStatusPage from './pages/PaymentStatusPage';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import OTPVerificationPage from './pages/OTPVerificationPage';
 import DashboardPage from './pages/DashboardPage';
 import BillingPage from './pages/BillingPage';
@@ -70,9 +71,15 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ThemeProvider from './components/ThemeProvider';
 import WhatsAppFloatingButton from './components/WhatsAppFloatingButton';
 import AnalyticsScripts from './components/AnalyticsScripts';
+import CreateOrganizationPage from './pages/organizations/CreateOrganizationPage';
+import OrganizationSettingsPage from './pages/organizations/OrganizationSettingsPage';
+import OrganizationProfilePage from './pages/organizations/OrganizationProfilePage';
+import OrganizationExplorePage from './pages/organizations/OrganizationExplorePage';
+import ProfilePage from './pages/ProfilePage';
 
 import { usePageTitle } from './hooks/usePageTitle';
 import { useAppName } from './hooks/useAppName';
+import { OrganizationProvider } from './context/OrganizationContext';
 
 function HomePage() {
   const { appName, tagline } = useAppName();
@@ -148,12 +155,17 @@ function AppContent() {
     location.pathname.startsWith('/zakat/settings') ||
     location.pathname.startsWith('/infaq/settings') ||
     location.pathname.startsWith('/fidyah/settings') ||
-    location.pathname.startsWith('/font/settings');
+    location.pathname.startsWith('/fidyah/settings') ||
+    location.pathname.startsWith('/font/settings') ||
+    location.pathname.startsWith('/organizations/');
 
   const content = (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/org/:slug/explore" element={<OrganizationExplorePage />} />
+      <Route path="/org/:slug" element={<OrganizationProfilePage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
       <Route path="/otp-verification" element={<OTPVerificationPage />} />
       <Route path="/donasi" element={<DonationForm />} />
       <Route path="/transactions" element={<DonationDashboard />} />
@@ -183,6 +195,14 @@ function AppContent() {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/profile"
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
           </ProtectedRoute>
         }
       />
@@ -314,6 +334,22 @@ function AppContent() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/organizations/new"
+        element={
+          <ProtectedRoute>
+            <CreateOrganizationPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/organizations/settings"
+        element={
+          <ProtectedRoute>
+            <OrganizationSettingsPage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* 404 Page (Catch All) */}
       <Route path="*" element={<NotFoundPage />} />
@@ -343,9 +379,11 @@ function App() {
   return (
     <ThemeProvider>
       <Router>
-        <Toaster position="top-center" richColors />
-        <AnalyticsScripts />
-        <AppContent />
+        <OrganizationProvider>
+          <Toaster position="top-center" richColors />
+          <AnalyticsScripts />
+          <AppContent />
+        </OrganizationProvider>
       </Router>
     </ThemeProvider>
   );

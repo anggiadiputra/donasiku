@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useOrganization } from '../context/OrganizationContext';
 import { Save, Loader2, Info, Coins } from 'lucide-react';
 import { toast } from 'sonner';
 import DashboardLayout from '../components/DashboardLayout';
@@ -7,6 +9,8 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { SettingsPageSkeleton } from '../components/SkeletonLoader';
 
 export default function ZakatSettingsPage() {
+  const navigate = useNavigate();
+  const { selectedOrganization } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -22,8 +26,13 @@ export default function ZakatSettingsPage() {
   });
 
   useEffect(() => {
+    if (selectedOrganization) {
+      toast.error('Akses Terbatas: Pengaturan zakat hanya dapat diakses melalui Akun Personal');
+      navigate('/dashboard');
+      return;
+    }
     fetchSettings();
-  }, []);
+  }, [selectedOrganization, navigate]);
 
   usePageTitle('Pengaturan Zakat');
 

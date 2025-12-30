@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp,
   ArrowUpRight, Calendar, Search, Filter, Download,
   ChevronDown, FileText, FileSpreadsheet
 } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 
 import { supabase } from '../lib/supabase';
@@ -20,14 +18,17 @@ import DashboardLayout from '../components/DashboardLayout';
 
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { isNetworkError } from '../utils/errorHandling';
+import { useOrganization } from '../context/OrganizationContext';
 
 export default function DashboardPage() {
   usePageTitle('Dashboard');
   const primaryColor = usePrimaryColor();
-  const navigate = useNavigate();
+  const { selectedOrganization } = useOrganization();
 
   // State for Data
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [chartReady, setChartReady] = useState(false);
   const [summary, setSummary] = useState({
     totalDonation: 0,
     totalDonors: 0,
@@ -45,24 +46,45 @@ export default function DashboardPage() {
   const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
-    fetchAnalytics();
     fetchUserProfile();
-  }, [timeframe]);
+    // Delay chart rendering and trigger window resize to help Recharts
+    const timer = setTimeout(() => {
+      setChartReady(true);
+      window.dispatchEvent(new Event('resize'));
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (userProfile) {
+      fetchAnalytics();
+    }
+  }, [timeframe, userProfile?.id, userProfile?.role, selectedOrganization?.id]);
 
   const fetchUserProfile = async (retryCount = 0) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data, error } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
 
         if (error) {
+          console.error('Error fetching profile from table:', error);
           if (isNetworkError(error) && retryCount < 2) {
             setTimeout(() => fetchUserProfile(retryCount + 1), 2000);
             return;
           }
         }
 
-        setUserProfile({ ...user, ...data });
+        // Try to find full name from various sources
+        const fullName = data?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || '';
+
+
+
+        setUserProfile({
+          ...user,
+          ...data,
+          display_name: fullName
+        });
       }
     } catch (err: any) {
       if (isNetworkError(err) && retryCount < 2) {
@@ -73,7 +95,10 @@ export default function DashboardPage() {
 
   const fetchAnalytics = async (retryCount = 0) => {
     try {
-      setLoading(true);
+      if (!loading) setRefreshing(true);
+      if (!userProfile) return;
+
+      const isAdmin = userProfile.role === 'admin';
 
       // Determine Date Range
       const now = new Date();
@@ -89,11 +114,40 @@ export default function DashboardPage() {
       }
 
       // 1. Fetch Transactions in Range
-      let { data: periodTx, error: txError } = await supabase
+      // Logic:
+      // - Admin: sees everything (unless Org context is forced? Maybe admin wants to see Org specific too).
+      // - Org Context Selected: Filter by organization_id.
+      // - Personal Context: Filter by user_id AND organization_id is NULL (Personal campaigns).
+
+      const selectStr = 'amount, created_at, customer_email, customer_phone, product_details, campaigns!inner(user_id, organization_id, title)';
+      // Note: We use !inner to ensure we can filter by campaign fields. 
+      // But wait, if transaction has no campaign (global), inner join fails.
+      // So valid transactions MUST have campaigns for this view? Mostly yes. 
+      // Exception: "General Donation" sometimes has null campaign_id?
+      // If so, we handled that differently before.
+
+      let query = supabase
         .from('transactions')
-        .select('amount, created_at, customer_email, customer_phone, product_details')
+        .select(selectStr)
         .eq('status', 'success')
         .gte('created_at', startDate.toISOString());
+
+      if (selectedOrganization) {
+        // Organization Context
+        query = query.eq('campaigns.organization_id', selectedOrganization.id);
+      } else {
+        // Personal Context
+        if (isAdmin) {
+          // Admin in Personal View -> Sees ALL (Global) or just their own?
+          // Usually Admin Dashboard shows Global Stats.
+          // We keep it as "Global" if Admin is in Personal View.
+        } else {
+          // Normal User Personal View -> Only their campaigns
+          query = query.eq('campaigns.user_id', userProfile.id);
+        }
+      }
+
+      let { data: periodTx, error: txError } = await query;
 
       if (txError) {
         if (isNetworkError(txError) && retryCount < 2) {
@@ -106,22 +160,46 @@ export default function DashboardPage() {
       if (!periodTx) periodTx = [];
 
       // 1b. Fetch All Transactions Count (in period)
-      const { count: totalTxPeriodCount, error: countError } = await supabase
+      // Logic mirrors above
+      const countSelectStr = 'campaigns!inner(user_id, organization_id)';
+      let countQuery = supabase
         .from('transactions')
-        .select('*', { count: 'exact', head: true })
+        .select(countSelectStr, { count: 'exact', head: true })
         .gte('created_at', startDate.toISOString());
+
+      if (selectedOrganization) {
+        countQuery = countQuery.eq('campaigns.organization_id', selectedOrganization.id);
+      } else {
+        if (!isAdmin) {
+          countQuery = countQuery.eq('campaigns.user_id', userProfile.id);
+        }
+      }
+
+      const { count: totalTxPeriodCount, error: countError } = await countQuery;
 
       if (countError) {
         // Not critical enough to fail entire thing if txError passed
         console.warn('Count fetch error:', countError);
       }
 
-      // 3. Fetch Recent Transactions (Always latest 10, regardless of filter for the list view)
-      const { data: recent, error: recentError } = await supabase
+      // 3. Fetch Recent Transactions
+      const recentSelectStr = 'id, amount, status, customer_name, created_at, invoice_code, campaigns!inner(title, user_id, organization_id)';
+
+      let recentQuery = supabase
         .from('transactions')
-        .select('id, amount, status, customer_name, created_at, invoice_code, campaigns(title)')
+        .select(recentSelectStr)
         .order('created_at', { ascending: false })
         .limit(10);
+
+      if (selectedOrganization) {
+        recentQuery = recentQuery.eq('campaigns.organization_id', selectedOrganization.id);
+      } else {
+        if (!isAdmin) {
+          recentQuery = recentQuery.eq('campaigns.user_id', userProfile.id);
+        }
+      }
+
+      const { data: recent, error: recentError } = await recentQuery;
 
       if (recentError) {
         if (isNetworkError(recentError) && retryCount < 2) {
@@ -227,9 +305,8 @@ export default function DashboardPage() {
         return;
       }
     } finally {
-      if (retryCount === 0 || !loading) {
-        setLoading(false);
-      }
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -306,8 +383,13 @@ export default function DashboardPage() {
       <div className="space-y-6">
         {/* Toolbar & Welcome Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Welcome back, {userProfile?.full_name?.split(' ')[0] || 'User'}</h1>
+          <div className={`${refreshing ? 'opacity-50' : ''} transition-opacity`}>
+            <h1 className="text-2xl font-bold text-gray-800">
+              Welcome back, {(() => {
+                const name = userProfile?.display_name?.split(' ')[0] || userProfile?.email?.split('@')[0] || 'User';
+                return name.charAt(0).toUpperCase() + name.slice(1);
+              })()}
+            </h1>
             <p className="text-sm text-gray-500">Here is your daily update.</p>
           </div>
 
@@ -390,7 +472,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ${refreshing ? 'opacity-70' : ''} transition-opacity`}>
           <SummaryCard
             title="TOTAL REVENUE"
             value={formatCurrency(summary.totalDonation)}
@@ -425,7 +507,7 @@ export default function DashboardPage() {
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Bar Chart */}
-          <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <div className={`lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6 shadow-sm ${refreshing ? 'opacity-70' : ''} transition-opacity`} style={{ minWidth: 0 }}>
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Donation Trend</h3>
@@ -448,36 +530,43 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={trendData} barGap={0}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                    dy={10}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                    tickFormatter={(value) => `${value / 1000}k`}
-                  />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    cursor={{ fill: '#F9FAFB' }}
-                    formatter={(value: any) => [formatCurrency(value as number), 'Donasi']}
-                  />
-                  <Bar
-                    dataKey="value"
-                    fill={primaryColor || "#111827"}
-                    radius={[4, 4, 0, 0]}
-                    barSize={20}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="h-[300px] w-full relative" style={{ height: '300px', minHeight: '300px' }}>
+              {chartReady && trendData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={290} debounce={50}>
+                  <BarChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                      dy={10}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                      tickFormatter={(value) => `${value / 1000}k`}
+                    />
+                    <Tooltip
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      cursor={{ fill: '#F9FAFB' }}
+                      formatter={(value: any) => [formatCurrency(value as number), 'Donasi']}
+                    />
+                    <Bar
+                      dataKey="value"
+                      fill={primaryColor || "#111827"}
+                      radius={[4, 4, 0, 0]}
+                      barSize={20}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 gap-2">
+                  <div className="w-8 h-8 border-2 border-gray-200 border-t-orange-500 rounded-full animate-spin"></div>
+                  <div className="text-xs">Loading chart data...</div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -601,7 +690,7 @@ export default function DashboardPage() {
   );
 }
 
-function SummaryCard({ title, value, subValue, trend, trendPositive, data }: any) {
+function SummaryCard({ title, value, subValue, trend, trendPositive }: any) {
   return (
     <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm flex flex-col justify-between h-[150px]">
       <div className="flex justify-between items-start">
@@ -611,12 +700,6 @@ function SummaryCard({ title, value, subValue, trend, trendPositive, data }: any
             <span className="text-2xl font-bold text-gray-900">{value}</span>
             {subValue && <span className="text-xs text-gray-500">{subValue}</span>}
           </div>
-        </div>
-        {/* Mini Sparkline Chart */}
-        <div className="w-[80px] h-[40px]">
-          <LineChart width={80} height={40} data={data.map((v: any, i: any) => ({ i, v }))}>
-            <Line type="monotone" dataKey="v" stroke={trendPositive !== false ? "#10B981" : "#EF4444"} strokeWidth={2} dot={false} />
-          </LineChart>
         </div>
       </div>
 

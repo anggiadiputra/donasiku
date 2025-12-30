@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Flame } from 'lucide-react';
 import { Campaign } from '../lib/supabase';
 import { createSlug } from '../utils/slug';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
@@ -69,9 +69,17 @@ export default function CampaignCard({ campaign, onClick }: CampaignCardProps) {
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300" />
         )}
+        {campaign.is_featured && (
+          <div
+            className="absolute top-1 right-1 text-white p-1 rounded-full shadow-lg z-10 flex items-center justify-center animate-pulse"
+            style={{ backgroundColor: '#FF4D4D' }}
+          >
+            <Flame className="w-3.5 h-3.5 fill-current" />
+          </div>
+        )}
         {campaign.is_urgent && (
           <div
-            className="absolute top-1 left-1 text-white px-1.5 py-0.5 rounded text-xs font-bold"
+            className="absolute top-1 left-1 text-white px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm"
             style={{ backgroundColor: primaryColor }}
           >
             SEDEKAH
@@ -84,7 +92,8 @@ export default function CampaignCard({ campaign, onClick }: CampaignCardProps) {
         <div>
           <div className="flex items-center gap-1.5 mb-1 flex-wrap">
             <span className="text-xs text-gray-700 truncate">
-              {campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Donasiku'}
+              {/* @ts-ignore */}
+              {campaign.organizations?.name || campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Donasiku'}
             </span>
             {campaign.is_verified && (
               <CheckCircle className="w-3 h-3 text-white flex-shrink-0" style={{ fill: primaryColor }} />

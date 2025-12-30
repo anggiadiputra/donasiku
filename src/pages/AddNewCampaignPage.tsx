@@ -13,9 +13,11 @@ import { supabase, Category } from '../lib/supabase';
 import { uploadToS3 } from '../utils/s3Storage';
 import { createSlug } from '../utils/slug';
 import RichTextEditor from '../components/RichTextEditor';
+import { useOrganization } from '../context/OrganizationContext';
 
 export default function AddNewCampaignPage() {
   const navigate = useNavigate();
+  const { selectedOrganization } = useOrganization();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -225,13 +227,6 @@ export default function AddNewCampaignPage() {
       // Generate slug from title if not manually edited
       const finalSlug = slug.trim() || createSlug(title);
 
-      // Fetch app settings (assuming there's a way to get the current app_settings_id)
-      // For now, we'll use a placeholder or assume it's not strictly required for initial insert
-      const { data: appSettingsData } = await supabase
-        .from('app_settings')
-        .select('id')
-        .single();
-      const appSettingsId = appSettingsData?.id || null;
 
 
       const campaignData = {
@@ -248,14 +243,14 @@ export default function AddNewCampaignPage() {
         is_verified: false, // Default to false
         status: publish ? 'published' : 'draft',
         user_id: user.id,
-        app_settings_id: appSettingsId, // Link to app settings
         target_location: location,
         gmaps_link: gmapsLink,
         form_type: formType,
         display_format: 'card',
         preset_amounts: presetAmountsNumeric,
-        organization_name: '',
-        organization_logo: '',
+        organization_name: selectedOrganization ? selectedOrganization.name : '', // Use selected Org name or empty
+        organization_logo: selectedOrganization ? selectedOrganization.logo_url : '', // use selected org logo or empty
+        organization_id: selectedOrganization ? selectedOrganization.id : null, // IMPORTANT: Link to org
         end_date: endDate ? new Date(endDate).toISOString() : null
       };
 

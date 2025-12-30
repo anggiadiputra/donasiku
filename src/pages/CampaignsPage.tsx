@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Menu, Bell, LogOut, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Menu, Bell, LogOut, Pencil, Trash2, Flame } from 'lucide-react';
 import { toast } from 'sonner';
 import Sidebar from '../components/Sidebar';
 import { useAppName } from '../hooks/useAppName';
@@ -9,12 +9,14 @@ import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { TableSkeleton } from '../components/SkeletonLoader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { isNetworkError, isDatabaseRelationshipError } from '../utils/errorHandling';
+import { useOrganization } from '../context/OrganizationContext';
 
 export default function CampaignsPage() {
   usePageTitle('Data Campaign');
   const navigate = useNavigate();
   const { appName } = useAppName();
   const primaryColor = usePrimaryColor();
+  const { selectedOrganization } = useOrganization();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +31,7 @@ export default function CampaignsPage() {
       fetchCampaigns();
     }, 500);
     return () => clearTimeout(timer);
-  }, [currentPage, entriesPerPage, searchQuery]);
+  }, [currentPage, entriesPerPage, searchQuery, selectedOrganization?.id]);
 
   const handleLogout = async () => {
     try {
@@ -49,7 +51,7 @@ export default function CampaignsPage() {
 
       let query = supabase
         .from('campaigns')
-        .select('*, profiles:user_id(full_name, organization_name)', { count: 'exact' })
+        .select('*, profiles:user_id(full_name, organization_name), organizations(name, logo_url)', { count: 'exact' })
         // Exclude system campaigns
         .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 
@@ -65,6 +67,30 @@ export default function CampaignsPage() {
           query = query.is('user_id', null);
         } else {
           query = query.eq('user_id', campaignerId);
+        }
+      } else {
+        // Context Filtering
+        // Get current user to check role
+        const { data: { user } } = await supabase.auth.getUser();
+        // Ideally we should know if isAdmin, but let's assume if context is used, we respect it.
+        // If we are admin, we might want to see ALL? 
+        // Typically Admin sees "Data Campaign" which lists EVERYTHING. 
+        // BUT if user switches to "My Org", they expect to see Org's campaigns.
+        // Let's rely on selectedOrganization.
+
+        if (selectedOrganization) {
+          query = query.eq('organization_id', selectedOrganization.id);
+        } else {
+          // Maybe check if Admin? If Admin and NO Filter, maybe show all? 
+          // But normally this page is "My Campaigns". 
+          // Let's filter by user_id if personal context
+          if (user) {
+            // Fetch profile to check role
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+            if (profile?.role !== 'admin') {
+              query = query.eq('user_id', user.id);
+            }
+          }
         }
       }
 
@@ -433,7 +459,10 @@ export default function CampaignsPage() {
                         </tr>
                       ) : (
                         currentCampaigns.map((campaign, index) => (
-                          <tr key={campaign.id} className="hover:bg-gray-50 transition-colors">
+                          <tr
+                            key={campaign.id}
+                            className={`transition-colors ${campaign.is_featured ? 'bg-amber-50/50 hover:bg-amber-100/80' : 'hover:bg-gray-50'}`}
+                          >
                             <td className="px-4 py-4 text-sm text-gray-600">{startIndex + index + 1}</td>
                             <td className="px-4 py-4 valign-top">
                               <div className="flex flex-col gap-2">
@@ -450,7 +479,14 @@ export default function CampaignsPage() {
                             </td>
                             <td className="px-4 py-4">
                               <div className="max-w-md">
-                                <p className="font-bold text-gray-800 text-sm mb-2 line-clamp-2 hover:text-blue-600 cursor-pointer">{campaign.title}</p>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <p className="font-bold text-gray-800 text-sm line-clamp-2 hover:text-blue-600 cursor-pointer flex-1">{campaign.title}</p>
+                                  {campaign.is_featured && (
+                                    <div className="flex-shrink-0 bg-orange-100 text-orange-600 p-1 rounded-md" title="Featured Campaign">
+                                      <Flame className="w-3.5 h-3.5 fill-current" />
+                                    </div>
+                                  )}
+                                </div>
                                 <div className="flex items-center gap-2">
                                   {getStatusBadge(campaign.status)}
                                   {campaign.category && (
@@ -490,20 +526,22 @@ export default function CampaignsPage() {
                               {campaign.end_date ? formatDate(campaign.end_date) : '∞'}
                             </td>
                             <td className="px-4 py-4 text-sm text-gray-600">
-                              {campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Rumah Anak Surga'}
+                              {/* @ts-ignore - joined data */}
+                              {campaign.organizations?.name || campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Rumah Anak Surga'}
                             </td>
                             <td className="px-4 py-4">
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => navigate(`/donasi/campaigns/edit/${campaign.id}`)}
-                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  className="flex items-center justify-center w-8 h-8 text-blue-600 bg-white border border-blue-200 rounded-lg shadow-sm hover:bg-blue-50 hover:border-blue-300 transition-all active:scale-95"
+                                  title="Edit Campaign"
                                 >
                                   <Pencil className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => handleDelete(campaign.id, campaign.title)}
-                                  className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                  title="Delete Campaign"
+                                  className="flex items-center justify-center w-8 h-8 text-red-600 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 hover:border-red-300 transition-all active:scale-95"
+                                  title="Hapus Campaign"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>

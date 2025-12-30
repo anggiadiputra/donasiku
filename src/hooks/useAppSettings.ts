@@ -21,8 +21,8 @@ export function useAppSettings() {
         if (data) {
           setSettings({
             ...data,
-            payment_methods: Array.isArray(data.payment_methods) 
-              ? data.payment_methods 
+            payment_methods: Array.isArray(data.payment_methods)
+              ? data.payment_methods
               : JSON.parse(data.payment_methods || '[]')
           });
         }

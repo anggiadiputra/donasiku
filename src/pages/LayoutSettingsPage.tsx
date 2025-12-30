@@ -100,14 +100,16 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { FileText as FileTextIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Toaster, toast } from 'sonner';
+import { toast } from 'sonner';
 import Sidebar from '../components/Sidebar';
 import ImageUpload from '../components/ImageUpload';
 
 import { supabase, LayoutSettings } from '../lib/supabase';
 import { SettingsPageSkeleton } from '../components/SkeletonLoader';
+import { uploadToS3ViaAPI, deleteFromS3 } from '../utils/s3Storage';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
+import { useOrganization } from '../context/OrganizationContext';
 
 // List of available icons from lucide-react
 const availableIcons = [
@@ -264,6 +266,7 @@ const SortableProgramItem = ({
 };
 
 export default function LayoutSettingsPage() {
+  const { selectedOrganization } = useOrganization();
   usePageTitle('Pengaturan Layout');
   const primaryColor = usePrimaryColor();
   const [loading, setLoading] = useState(true);
@@ -310,8 +313,13 @@ export default function LayoutSettingsPage() {
   });
 
   useEffect(() => {
+    if (selectedOrganization) {
+      toast.error('Akses Terbatas: Pengaturan dan layout donasi hanya dapat diakses melalui Akun Personal');
+      navigate('/dashboard');
+      return;
+    }
     fetchSettings();
-  }, []);
+  }, [selectedOrganization, navigate]);
 
   const fetchSettings = async () => {
     try {
@@ -525,7 +533,19 @@ export default function LayoutSettingsPage() {
     }
   };
 
-  const removeSliderItem = (type: 'hero' | 'promo' | 'cta', index: number) => {
+
+  const removeSliderItem = async (type: 'hero' | 'promo' | 'cta', index: number) => {
+    // Auto-delete image from S3 if exists
+    let itemToRemove: any;
+    if (type === 'hero') itemToRemove = settings.hero_slider_items[index];
+    else if (type === 'promo') itemToRemove = (settings.promo_slider_items || [])[index];
+    else itemToRemove = (settings.cta_slider_items || [])[index];
+
+    if (itemToRemove && itemToRemove.image) {
+
+      await deleteFromS3(itemToRemove.image);
+    }
+
     if (type === 'hero') {
       setSettings(prev => ({
         ...prev,

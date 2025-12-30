@@ -1,6 +1,6 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { S3Client, PutObjectCommand } from 'npm:@aws-sdk/client-s3@3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from 'npm:@aws-sdk/client-s3@3';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -14,9 +14,66 @@ serve(async (req) => {
     }
 
     try {
-        const { fileName, fileContent, contentType } = await req.json();
+        const payload = await req.json();
+        const { fileName, fileContent, contentType, operation = 'upload' } = payload;
 
-        // Validate required parameters
+        // Get S3 config from environment variables
+        const s3AccessKey = Deno.env.get('S3_ACCESS_KEY') || Deno.env.get('S3_ACCESS_KEY_ID');
+        const s3SecretKey = Deno.env.get('S3_SECRET_KEY') || Deno.env.get('S3_SECRET_ACCESS_KEY');
+        const s3Endpoint = Deno.env.get('S3_ENDPOINT');
+        const s3Region = Deno.env.get('S3_REGION') || 'auto';
+        const s3Bucket = Deno.env.get('S3_BUCKET');
+
+        if (!s3AccessKey || !s3SecretKey || !s3Endpoint || !s3Bucket) {
+            return new Response(
+                JSON.stringify({
+                    success: false,
+                    error: 'S3 configuration incomplete in environment variables',
+                }),
+                {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 500,
+                }
+            );
+        }
+
+        // Create S3 client
+        const s3Client = new S3Client({
+            credentials: {
+                accessKeyId: s3AccessKey,
+                secretAccessKey: s3SecretKey,
+            },
+            endpoint: s3Endpoint,
+            region: s3Region,
+            forcePathStyle: true,
+        });
+
+        if (operation === 'delete') {
+            if (!fileName) {
+                throw new Error('Missing fileName for delete operation');
+            }
+
+            console.log('[S3] Deleting file:', fileName);
+            const deleteCommand = new DeleteObjectCommand({
+                Bucket: s3Bucket,
+                Key: fileName,
+            });
+
+            await s3Client.send(deleteCommand);
+
+            return new Response(
+                JSON.stringify({
+                    success: true,
+                    message: 'File deleted successfully from S3',
+                }),
+                {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 200,
+                }
+            );
+        }
+
+        // Default: UPLOAD
         if (!fileName || !fileContent) {
             return new Response(
                 JSON.stringify({
@@ -30,41 +87,7 @@ serve(async (req) => {
             );
         }
 
-        // Get S3 config from environment variables
-        // Support both S3_ACCESS_KEY (User preferred) and S3_ACCESS_KEY_ID (Standard)
-        const s3AccessKey = Deno.env.get('S3_ACCESS_KEY') || Deno.env.get('S3_ACCESS_KEY_ID');
-        const s3SecretKey = Deno.env.get('S3_SECRET_KEY') || Deno.env.get('S3_SECRET_ACCESS_KEY');
-        const s3Endpoint = Deno.env.get('S3_ENDPOINT');
-        const s3Region = Deno.env.get('S3_REGION') || 'auto';
-        const s3Bucket = Deno.env.get('S3_BUCKET');
-
-        if (!s3AccessKey || !s3SecretKey || !s3Endpoint || !s3Bucket) {
-            console.error("Missing S3 configuration");
-            console.log(`Endpoint: ${s3Endpoint}, Bucket: ${s3Bucket}, Key present: ${!!s3AccessKey}`);
-            return new Response(
-                JSON.stringify({
-                    success: false,
-                    error: 'S3 configuration incomplete in environment variables',
-                }),
-                {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                    status: 500,
-                }
-            );
-        }
-
-        console.log('[S3 Upload] Uploading file:', fileName);
-
-        // Create S3 client
-        const s3Client = new S3Client({
-            credentials: {
-                accessKeyId: s3AccessKey,
-                secretAccessKey: s3SecretKey,
-            },
-            endpoint: s3Endpoint,
-            region: s3Region,
-            forcePathStyle: true, // Needed for many S3 compatible providers
-        });
+        console.log('[S3] Uploading file:', fileName);
 
         // Convert base64 to buffer
         const binaryString = atob(fileContent);
@@ -79,31 +102,26 @@ serve(async (req) => {
             Key: fileName,
             Body: bytes,
             ContentType: contentType || 'application/octet-stream',
-            ACL: 'public-read', // Make file publicly accessible
+            ACL: 'public-read',
         });
 
         await s3Client.send(putCommand);
 
         // Construct public URL
         let publicUrl: string;
-
-        // Check if explicit Public URL env default exists
         const envPublicUrl = Deno.env.get('S3_PUBLIC_URL');
 
         if (envPublicUrl) {
-            // Handle trailing slash
             const cleanBase = envPublicUrl.replace(/\/$/, '');
             publicUrl = `${cleanBase}/${fileName}`;
         } else if (s3Endpoint.includes('amazonaws.com')) {
-            // AWS S3 format
             publicUrl = `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${fileName}`;
         } else {
-            // Generic S3 compatible (MinIO, Backblaze, etc)
-            const cleanEndpoint = s3Endpoint.replace(/\/$/, ''); // Remove trailing slash
+            const cleanEndpoint = s3Endpoint.replace(/\/$/, '');
             publicUrl = `${cleanEndpoint}/${s3Bucket}/${fileName}`;
         }
 
-        console.log('[S3 Upload] ✅ File uploaded successfully:', publicUrl);
+        console.log('[S3] ✅ File uploaded successfully:', publicUrl);
 
         return new Response(
             JSON.stringify({
@@ -118,12 +136,11 @@ serve(async (req) => {
         );
 
     } catch (error: any) {
-        console.error('[S3 Upload] Error:', error);
-
+        console.error('[S3] Error:', error);
         return new Response(
             JSON.stringify({
                 success: false,
-                error: error.message || 'Failed to upload file to S3',
+                error: error.message || 'Operation failed',
                 details: error.toString(),
             }),
             {

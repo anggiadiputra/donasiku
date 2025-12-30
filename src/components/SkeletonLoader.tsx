@@ -709,3 +709,76 @@ export const CampaignPrayersSkeleton = () => (
         </div>
     </div>
 );
+
+// Organization Profile Page Skeleton
+export const OrganizationProfileSkeleton = () => (
+    <div className="flex flex-col min-h-screen bg-[#F8FAFC]">
+        {/* Sticky Header Skeleton */}
+        <div className="sticky top-0 z-30 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+            <SkeletonCircle size="w-9 h-9" />
+            <div className="flex items-center gap-2">
+                <SkeletonBox className="w-6 h-6 rounded-md" />
+                <SkeletonBox className="h-4 w-32" />
+            </div>
+            <SkeletonCircle size="w-8 h-8" />
+        </div>
+
+        <div className="flex-1 pb-16">
+            {/* Visual Header / Cover Skeleton */}
+            <div className="h-32 md:h-40 w-full bg-gray-200 animate-pulse relative" />
+
+            {/* Profile Section Skeleton */}
+            <div className="px-5 -mt-12 relative z-10">
+                <div className="bg-white rounded-[2.5rem] shadow-xl p-6 border border-gray-50">
+                    <div className="flex flex-col items-center text-center">
+                        {/* Large Floating Logo Skeleton */}
+                        <div className="w-24 h-24 rounded-[2rem] bg-white p-1 shadow-lg -mt-16 border border-gray-50 overflow-hidden flex items-center justify-center">
+                            <SkeletonCircle size="w-20 h-20 rounded-[1.8rem]" />
+                        </div>
+
+                        {/* Title & Info Skeleton */}
+                        <div className="mt-4 flex flex-col items-center space-y-2">
+                            <SkeletonBox className="h-4 w-20 rounded" /> {/* ORG Tag */}
+                            <SkeletonBox className="h-8 w-48 rounded-lg" /> {/* Name */}
+                            <SkeletonBox className="h-4 w-32 rounded" /> {/* Location */}
+                        </div>
+
+                        {/* Description Skeleton */}
+                        <div className="mt-4 w-full max-w-sm">
+                            <SkeletonText lines={3} className="items-center" />
+                        </div>
+
+                        {/* Stats Skeleton */}
+                        <div className="grid grid-cols-3 gap-6 w-full mt-6 py-4 border-t border-b border-gray-50">
+                            {[1, 2, 3].map(i => (
+                                <div key={i}>
+                                    <SkeletonBox className="h-6 w-12 mx-auto mb-1" />
+                                    <SkeletonBox className="h-3 w-16 mx-auto" />
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Action Buttons Skeleton */}
+                        <div className="flex gap-3 w-full mt-6">
+                            <SkeletonBox className="flex-1 h-14 rounded-2xl" />
+                            <SkeletonBox className="w-14 h-14 rounded-2xl" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Campaigns Section Skeleton */}
+            <div className="p-4 mt-6">
+                <div className="flex items-center justify-between mb-4">
+                    <SkeletonBox className="h-6 w-32" />
+                    <SkeletonBox className="h-6 w-16 rounded-full" />
+                </div>
+                <div className="space-y-4">
+                    {[1, 2, 3].map(i => (
+                        <CampaignCardSkeleton key={i} />
+                    ))}
+                </div>
+            </div>
+        </div>
+    </div>
+);

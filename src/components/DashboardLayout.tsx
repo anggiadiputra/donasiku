@@ -1,6 +1,6 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Bell, Menu } from 'lucide-react';
+import { LogOut, Bell, Menu, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Sidebar from './Sidebar';
 
@@ -11,6 +11,22 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [profile, setProfile] = useState<{ avatar_url?: string } | null>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('avatar_url')
+          .eq('id', user.id)
+          .single();
+        if (data) setProfile(data);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -61,6 +77,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <div className="flex items-center gap-2">
                 <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                   <Bell className="w-5 h-5 text-gray-600" />
+                </button>
+                <button
+                  onClick={() => navigate('/dashboard/profile')}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors overflow-hidden border border-transparent hover:border-gray-200"
+                >
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
+                  ) : (
+                    <div className="p-1.5">
+                      <User className="w-5 h-5 text-gray-600" />
+                    </div>
+                  )}
                 </button>
                 <button
                   onClick={handleLogout}

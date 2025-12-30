@@ -1,4 +1,4 @@
-import { TrendingUp, DollarSign, Users, Menu, Bell, LogOut, BarChart as BarChartIcon } from 'lucide-react';
+import { TrendingUp, DollarSign, Users, Menu, Bell, LogOut } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
@@ -7,14 +7,17 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { SkeletonBox } from '../components/SkeletonLoader';
+import { useOrganization } from '../context/OrganizationContext';
 
 export default function AnalyticsPage() {
   usePageTitle('Analytics');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const primaryColor = usePrimaryColor();
+  const { selectedOrganization } = useOrganization();
 
   const [loading, setLoading] = useState(true);
+  const [chartReady, setChartReady] = useState(false);
   const [summary, setSummary] = useState({
     totalDonation: 0,
     totalDonors: 0,
@@ -40,17 +43,34 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+    const timer = setTimeout(() => setChartReady(true), 500);
+    return () => clearTimeout(timer);
+  }, [selectedOrganization?.id]);
 
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
 
-      // Fetch all successful transactions
-      const { data: transactions, error } = await supabase
+      // Fetch successful transactions
+      let query = supabase
         .from('transactions')
-        .select('amount, created_at, customer_email, customer_phone, campaign_id, product_details, campaigns(title)')
+        .select('amount, created_at, customer_email, customer_phone, campaign_id, product_details, campaigns!inner(title, user_id, organization_id)')
         .eq('status', 'success');
+
+      if (selectedOrganization) {
+        query = query.eq('campaigns.organization_id', selectedOrganization.id);
+      } else {
+        // Personal context
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+          if (profile?.role !== 'admin') {
+            query = query.eq('campaigns.user_id', user.id);
+          }
+        }
+      }
+
+      const { data: transactions, error } = await query;
 
       if (error) throw error;
 
@@ -218,16 +238,18 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
               <h3 className="text-lg font-bold text-gray-800 mb-4">Donasi per Bulan (1 Tahun Terakhir)</h3>
-              <div className="h-64">
-                {loading ? (
-                  <SkeletonBox className="w-full h-full rounded" />
+              <div className="h-64 relative overflow-hidden" style={{ minHeight: '256px' }}>
+                {!chartReady ? (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <div className="animate-pulse">Loading chart...</div>
+                  </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={256} minWidth={0}>
                     <BarChart data={trendData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
                       <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `${val / 1000}k`} />
-                      <Tooltip formatter={(value: number) => [formatCurrency(value), 'Donasi']} />
+                      <Tooltip formatter={(value: any) => [formatCurrency(value as number), 'Donasi']} />
                       <Bar dataKey="value" fill={primaryColor || "#F97316"} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>

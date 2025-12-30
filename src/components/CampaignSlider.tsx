@@ -65,7 +65,7 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                 // 2. Fetch Campaigns based on settings
                 let query = supabase
                     .from('campaigns')
-                    .select('*, profiles:user_id(full_name, organization_name, avatar_url)')
+                    .select('*, profiles:user_id(full_name, organization_name, avatar_url), organizations(name, logo_url)')
                     .eq('status', 'published')
                     .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 
@@ -100,7 +100,7 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
             } else {
                 const { data, error } = await supabase
                     .from('campaigns')
-                    .select('*, profiles:user_id(full_name, organization_name, avatar_url)')
+                    .select('*, profiles:user_id(full_name, organization_name, avatar_url), organizations(name, logo_url)')
                     .eq('status', 'published')
                     .order('created_at', { ascending: false })
                     .limit(10);
@@ -208,7 +208,8 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                                         {/* Organization */}
                                         <div className="flex items-center gap-1.5 mb-2">
                                             <span className="text-xs font-medium text-gray-600 truncate max-w-[140px]">
-                                                {campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Donasiku'}
+                                                {/* @ts-ignore */}
+                                                {campaign.organizations?.name || campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Donasiku'}
                                             </span>
                                             {campaign.is_verified && (
                                                 <CheckCircle className="w-3 h-3 text-blue-500 fill-current" />

@@ -215,39 +215,108 @@ export const uploadToS3Direct = async (
  * 
  * @param file File to upload
  * @param folder Folder path in bucket
- * @param fallbackUrl URL to return if upload fails (e.g., existing image URL)
- * @returns Public URL of uploaded file or fallback URL
+ * @param existingUrl The current URL (if any) to be replaced and deleted from S3
+ * @returns Public URL of uploaded file or existingUrl if upload fails
  */
 export const uploadToS3 = async (
   file: File,
   folder: string = 'campaigns',
-  fallbackUrl?: string | null
+  existingUrl?: string | null
 ): Promise<string | null> => {
   // Try S3 API endpoint first (recommended)
   const s3ApiEndpoint = import.meta.env.VITE_S3_API_ENDPOINT;
 
   if (s3ApiEndpoint && s3ApiEndpoint.trim() !== '') {
-
     const s3Url = await uploadToS3ViaAPI(file, folder);
     if (s3Url) {
-
+      // SUCCESS! Now delete the old file if it exists and looks like an S3 URL
+      if (existingUrl) {
+        console.log('[S3] New upload successful, deleting old file:', existingUrl);
+        await deleteFromS3(existingUrl);
+      }
       return s3Url;
     }
-
   }
 
   // If no API endpoint, try direct upload (not recommended)
   const s3Config = getS3Config();
   if (s3Config) {
-
     const directUrl = await uploadToS3Direct(file, folder);
     if (directUrl) {
+      // SUCCESS!
+      if (existingUrl) {
+        await deleteFromS3(existingUrl);
+      }
       return directUrl;
     }
   }
 
-  // Return fallback URL if provided
-  return fallbackUrl || null;
+  // Return existing URL as fallback if upload fails
+  return existingUrl || null;
 };
 
 
+/**
+ * Delete file from S3-compatible storage via backend API
+ * 
+ * @param fileUrl Full public URL of the file to delete
+ * @returns boolean indicating success
+ */
+export const deleteFromS3 = async (fileUrl: string): Promise<boolean> => {
+  if (!fileUrl || !fileUrl.startsWith('http')) return false;
+
+  try {
+    const endpoint = import.meta.env.VITE_S3_API_ENDPOINT;
+    if (!endpoint) return false;
+
+    const publicUrlBase = import.meta.env.VITE_S3_PUBLIC_URL;
+    const s3Bucket = import.meta.env.VITE_S3_BUCKET;
+    const s3Endpoint = import.meta.env.VITE_S3_ENDPOINT;
+
+    let fileName = '';
+
+    // Extract fileName (key) from URL
+    if (publicUrlBase && fileUrl.startsWith(publicUrlBase)) {
+      fileName = fileUrl.replace(publicUrlBase, '').replace(/^\//, '');
+    } else if (fileUrl.includes(s3Bucket) && (fileUrl.includes('amazonaws.com') || fileUrl.includes(s3Endpoint))) {
+      // Try to extract from common S3 URL patterns
+      // Pattern: https://bucket.s3.region.amazonaws.com/key
+      // Pattern: https://endpoint/bucket/key
+      const parts = fileUrl.split(s3Bucket + '/');
+      if (parts.length > 1) {
+        fileName = parts[1];
+      }
+    }
+
+    if (!fileName) {
+      console.warn('Could not extract S3 key from URL:', fileUrl);
+      return false;
+    }
+
+    console.log('[S3] Requesting deletion for key:', fileName);
+
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${anonKey}`,
+      },
+      body: JSON.stringify({
+        fileName,
+        operation: 'delete'
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to delete from S3:', await response.text());
+      return false;
+    }
+
+    const data = await response.json();
+    return data.success === true;
+  } catch (error) {
+    console.error('Error in deleteFromS3:', error);
+    return false;
+  }
+};

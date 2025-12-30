@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, MoreHorizontal, CheckCircle, XCircle, AlertCircle, Edit, Trash2, Menu, Bell, LogOut, Users, Target, DollarSign, Edit2, Eye, X } from 'lucide-react';
+import { Search, Menu, Bell, LogOut, Users, Target, DollarSign, Edit2, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
+import { useOrganization } from '../context/OrganizationContext';
 // import { useAppName } from '../hooks/useAppName';
 import { TableSkeleton } from '../components/SkeletonLoader';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -24,6 +25,7 @@ interface Campaigner {
 
 export default function CampaignersPage() {
     const navigate = useNavigate();
+    const { selectedOrganization } = useOrganization();
     // const { appName } = useAppName();
     const [campaigners, setCampaigners] = useState<Campaigner[]>([]);
     const [loading, setLoading] = useState(true);
@@ -46,7 +48,7 @@ export default function CampaignersPage() {
 
     useEffect(() => {
         fetchCampaigners();
-    }, []);
+    }, [selectedOrganization]); // Re-fetch when context changes
 
     // Set page title
     usePageTitle('Data Campaigner');
@@ -55,11 +57,23 @@ export default function CampaignersPage() {
         try {
             setLoading(true);
 
-            // Fetch all campaigns with user info
-            const { data: campaigns, error: campError } = await supabase
+            await supabase.auth.getUser();
+
+
+            let query = supabase
                 .from('campaigns')
-                .select('id, user_id, organization_name, target_amount, current_amount, status, created_at')
+                .select('id, user_id, organization_name, target_amount, current_amount, status, created_at, organization_id')
                 .order('created_at', { ascending: false });
+
+            if (selectedOrganization) {
+                query = query.eq('organization_id', selectedOrganization.id);
+            }
+            // If no organization selected, we fetch ALL campaigns (Global View)
+            // RLS will ensure users only see what they are allowed to see.
+            // Admins will see all campaigns. Regular users see their own.
+
+            const { data: campaigns, error: campError } = await query;
+
 
             if (campError) throw campError;
 

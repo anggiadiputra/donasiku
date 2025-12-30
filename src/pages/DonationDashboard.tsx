@@ -37,23 +37,45 @@ export default function DonationDashboard() {
     const [entriesPerPage, setEntriesPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
+    const [userProfile, setUserProfile] = useState<any>(null);
+
+    useEffect(() => {
+        fetchUserProfile();
+    }, []);
+
+    const fetchUserProfile = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+            setUserProfile({ ...user, ...data });
+        }
+    };
 
     // Debounce search
     useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchData();
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [currentPage, entriesPerPage, searchTerm]);
+        if (userProfile) {
+            const timer = setTimeout(() => {
+                fetchData();
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [currentPage, entriesPerPage, searchTerm, userProfile]);
 
     const fetchData = async () => {
         try {
+            if (!userProfile) return;
             setLoading(true);
+
+            const isAdmin = userProfile.role === 'admin';
 
             // Fetch transactions with pagination
             let query = supabase
                 .from('transactions')
-                .select('*', { count: 'exact' });
+                .select(isAdmin ? '*, campaigns(title)' : '*, campaigns!inner(title, user_id)', { count: 'exact' });
+
+            if (!isAdmin) {
+                query = query.eq('campaigns.user_id', userProfile.id);
+            }
 
             if (searchTerm) {
                 query = query.or(`customer_name.ilike.%${searchTerm}%,customer_phone.ilike.%${searchTerm}%,invoice_code.ilike.%${searchTerm}%`);
