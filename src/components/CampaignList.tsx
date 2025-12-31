@@ -26,7 +26,7 @@ export default function CampaignList({ onCampaignClick }: CampaignListProps) {
       // 1. Fetch Featured Campaigns (max 3)
       const { data: featuredData, error: featuredError } = await supabase
         .from('campaigns')
-        .select('*, profiles:user_id(full_name, organization_name, avatar_url), organizations(name, logo_url)')
+        .select('*, profiles:user_id(full_name, organization_name, avatar_url, role, verification_status), organizations(name, logo_url, verification_status)')
         .eq('status', 'published')
         .eq('is_featured', true)
         .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")')
@@ -41,7 +41,7 @@ export default function CampaignList({ onCampaignClick }: CampaignListProps) {
       // 2. Fetch Latest Campaigns to fill the rest (total 5)
       const { data: latestData, error: latestError } = await supabase
         .from('campaigns')
-        .select('*, profiles:user_id(full_name, organization_name, avatar_url), organizations(name, logo_url)')
+        .select('*, profiles:user_id(full_name, organization_name, avatar_url, role, verification_status), organizations(name, logo_url, verification_status)')
         .eq('status', 'published')
         .not('id', 'in', `(${featuredIds.length > 0 ? featuredIds.map(id => `"${id}"`).join(',') : '"00000000-0000-0000-0000-000000000000"'})`)
         .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")')
@@ -56,7 +56,7 @@ export default function CampaignList({ onCampaignClick }: CampaignListProps) {
       // Simple fallback
       const { data: fallbackData } = await supabase
         .from('campaigns')
-        .select('*')
+        .select('*, profiles:user_id(full_name, organization_name, avatar_url, role, verification_status), organizations(name, logo_url, verification_status)')
         .eq('status', 'published')
         .order('created_at', { ascending: false })
         .limit(5);

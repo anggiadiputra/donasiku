@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Menu, Bell, LogOut, Users, Target, DollarSign, Edit2, Eye, X } from 'lucide-react';
+import { Search, Menu, Bell, LogOut, Users, Target, DollarSign, Edit2, Eye, X, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -8,12 +8,15 @@ import { useOrganization } from '../context/OrganizationContext';
 // import { useAppName } from '../hooks/useAppName';
 import { TableSkeleton } from '../components/SkeletonLoader';
 import { usePageTitle } from '../hooks/usePageTitle';
+import VerifiedBadge from '../components/VerifiedBadge';
 
 interface Campaigner {
     user_id: string;
     user_email: string;
     organization_name: string;
     phone_number?: string;
+    verification_status: 'unverified' | 'pending' | 'verified' | 'rejected';
+    bio?: string;
     total_campaigns: number;
     active_campaigns: number;
     total_raised: number;
@@ -21,11 +24,14 @@ interface Campaigner {
     total_donors: number;
     first_campaign: string;
     last_campaign: string;
+    organization_id?: string;
+    org_verification_status?: 'unverified' | 'pending' | 'verified' | 'rejected';
+    role?: string;
 }
 
 export default function CampaignersPage() {
     const navigate = useNavigate();
-    const { selectedOrganization } = useOrganization();
+    const { selectedOrganization, refreshOrganizations } = useOrganization();
     // const { appName } = useAppName();
     const [campaigners, setCampaigners] = useState<Campaigner[]>([]);
     const [loading, setLoading] = useState(true);
@@ -38,7 +44,12 @@ export default function CampaignersPage() {
     // Edit modal state
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingCampaigner, setEditingCampaigner] = useState<Campaigner | null>(null);
-    const [editForm, setEditForm] = useState({ organization_name: '', phone_number: '' });
+    const [editForm, setEditForm] = useState({
+        organization_name: '',
+        phone_number: '',
+        verification_status: 'unverified' as any,
+        org_verification_status: 'unverified' as any
+    });
     const [saving, setSaving] = useState(false);
 
     const handleLogout = async () => {
@@ -57,107 +68,101 @@ export default function CampaignersPage() {
         try {
             setLoading(true);
 
-            await supabase.auth.getUser();
-
-
-            let query = supabase
-                .from('campaigns')
-                .select('id, user_id, organization_name, target_amount, current_amount, status, created_at, organization_id')
-                .order('created_at', { ascending: false });
-
             if (selectedOrganization) {
-                query = query.eq('organization_id', selectedOrganization.id);
-            }
-            // If no organization selected, we fetch ALL campaigns (Global View)
-            // RLS will ensure users only see what they are allowed to see.
-            // Admins will see all campaigns. Regular users see their own.
+                // Fetch ALL members of the organization
+                const { data: members, error: memberError } = await supabase
+                    .from('organization_members')
+                    .select('user_id, role, created_at, profiles:user_id(id, email, phone, organization_name, verification_status, role, bio), organizations(id, verification_status)')
+                    .eq('organization_id', selectedOrganization.id);
 
-            const { data: campaigns, error: campError } = await query;
+                if (memberError) throw memberError;
 
+                // Fetch all campaigns for this organization
+                const { data: campaigns, error: campError } = await supabase
+                    .from('campaigns')
+                    .select('id, user_id, target_amount, current_amount, status, created_at')
+                    .eq('organization_id', selectedOrganization.id);
 
-            if (campError) throw campError;
+                if (campError) throw campError;
 
-            // Fetch profiles to get emails, phone, and organization_name
-            const userIds = [...new Set(campaigns?.map(c => c.user_id).filter(Boolean))];
-            const { data: profiles } = await supabase
-                .from('profiles')
-                .select('id, email, phone, organization_name')
-                .in('id', userIds);
+                // Fetch transactions for these campaigns
+                const campaignIds = campaigns?.map(c => c.id) || [];
+                const { data: transactions } = await supabase
+                    .from('transactions')
+                    .select('campaign_id, customer_name, customer_phone, customer_email, status')
+                    .eq('status', 'success')
+                    .in('campaign_id', campaignIds);
 
-            const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+                const campaignerMap = new Map<string, Campaigner>();
 
-            // Fetch transactions to count donors (only campaign-related transactions)
-            const { data: transactions } = await supabase
-                .from('transactions')
-                .select('campaign_id, customer_name, customer_phone, customer_email, status')
-                .eq('status', 'success')
-                .not('campaign_id', 'is', null); // Exclude fidyah, zakat, infaq transactions
+                members?.forEach((m: any) => {
+                    const profile = m.profiles;
+                    const userId = m.user_id;
 
-            // Group by campaigner (user_id)
-            const campaignerMap = new Map<string, Campaigner>();
+                    const userCampaigns = campaigns?.filter(c => c.user_id === userId) || [];
+                    const totalRaised = userCampaigns.reduce((sum, c) => sum + (c.current_amount || 0), 0);
+                    const totalTarget = userCampaigns.reduce((sum, c) => sum + (c.target_amount || 0), 0);
 
-            campaigns?.forEach((camp) => {
-                const userId = camp.user_id || 'unknown';
-                const profile = profileMap.get(userId);
+                    const campaignerTxs = transactions?.filter(tx =>
+                        userCampaigns.some(c => c.id === tx.campaign_id)
+                    ) || [];
+                    const uniqueDonors = new Set(campaignerTxs.map(tx => tx.customer_phone || tx.customer_email).filter(Boolean)).size;
 
-                if (campaignerMap.has(userId)) {
-                    const campaigner = campaignerMap.get(userId)!;
-                    campaigner.total_campaigns += 1;
-                    if (camp.status === 'published') {
-                        campaigner.active_campaigns += 1;
-                    }
-                    campaigner.total_raised += camp.current_amount || 0;
-                    campaigner.total_target += camp.target_amount || 0;
-
-                    // Update last campaign if newer
-                    if (new Date(camp.created_at) > new Date(campaigner.last_campaign)) {
-                        campaigner.last_campaign = camp.created_at;
-                    }
-
-                    // Update first campaign if older
-                    if (new Date(camp.created_at) < new Date(campaigner.first_campaign)) {
-                        campaigner.first_campaign = camp.created_at;
-                    }
-                } else {
                     campaignerMap.set(userId, {
                         user_id: userId,
                         user_email: profile?.email || '-',
-                        organization_name: profile?.organization_name || camp.organization_name || 'Unknown Organization',
+                        organization_name: profile?.organization_name || selectedOrganization.name,
                         phone_number: profile?.phone || '',
-                        total_campaigns: 1,
-                        active_campaigns: camp.status === 'published' ? 1 : 0,
-                        total_raised: camp.current_amount || 0,
-                        total_target: camp.target_amount || 0,
-                        total_donors: 0, // Will calculate below
-                        first_campaign: camp.created_at,
-                        last_campaign: camp.created_at,
+                        verification_status: profile?.verification_status || 'unverified',
+                        bio: profile?.bio || '',
+                        total_campaigns: userCampaigns.length,
+                        active_campaigns: userCampaigns.filter(c => c.status === 'published').length,
+                        total_raised: totalRaised,
+                        total_target: totalTarget,
+                        total_donors: uniqueDonors,
+                        first_campaign: userCampaigns.length > 0
+                            ? userCampaigns.reduce((min, c) => new Date(c.created_at) < new Date(min) ? c.created_at : min, userCampaigns[0].created_at)
+                            : (m.created_at || new Date().toISOString()),
+                        last_campaign: userCampaigns.length > 0
+                            ? userCampaigns.reduce((max, c) => new Date(c.created_at) > new Date(max) ? c.created_at : max, userCampaigns[0].created_at)
+                            : (m.created_at || new Date().toISOString()),
+                        organization_id: m.organizations?.id,
+                        org_verification_status: m.organizations?.verification_status || 'unverified',
+                        role: profile?.role
                     });
-                }
-            });
+                });
 
-            // Calculate unique donors per campaigner (iterate through campaigners, not campaigns)
-            campaignerMap.forEach((campaigner, userId) => {
-                // Get all campaigns for this campaigner
-                const campaignerCampaigns = campaigns?.filter(c => c.user_id === userId) || [];
-                const campaignIds = campaignerCampaigns.map(c => c.id);
+                setCampaigners(Array.from(campaignerMap.values()));
+            } else {
+                // Global view (Global Admin) - Fetch from SQL View for performance
+                const { data, error } = await supabase
+                    .from('campaigner_stats_view')
+                    .select('*')
+                    .order('total_raised', { ascending: false });
 
-                // Get all transactions for this campaigner's campaigns
-                const campaignerTxs = transactions?.filter(tx =>
-                    campaignIds.includes(tx.campaign_id)
-                ) || [];
+                if (error) throw error;
 
-                // Count unique donors (by phone or email)
-                const uniqueDonors = new Set(
-                    campaignerTxs
-                        .map(tx => tx.customer_phone || tx.customer_email)
-                        .filter(Boolean) // Remove null/undefined values
-                );
+                const mappedCampaigners: Campaigner[] = data.map((d: any) => ({
+                    user_id: d.user_id,
+                    user_email: d.email,
+                    organization_name: d.organization_name,
+                    phone_number: d.phone_number,
+                    verification_status: d.verification_status,
+                    bio: d.bio,
+                    total_campaigns: d.total_campaigns,
+                    active_campaigns: d.active_campaigns,
+                    total_raised: d.total_raised,
+                    total_target: d.total_target,
+                    total_donors: d.total_donors,
+                    first_campaign: d.first_campaign_date || d.joined_at || new Date().toISOString(),
+                    last_campaign: d.last_campaign_date || d.joined_at || new Date().toISOString(),
+                    organization_id: d.organization_id,
+                    org_verification_status: d.org_verification_status,
+                    role: d.role
+                }));
 
-                campaigner.total_donors = uniqueDonors.size;
-            });
-
-            const campaignersList = Array.from(campaignerMap.values());
-            setCampaigners(campaignersList);
+                setCampaigners(mappedCampaigners);
+            }
         } catch (error) {
             console.error('Error fetching campaigners:', error);
         } finally {
@@ -187,11 +192,55 @@ export default function CampaignersPage() {
         return Math.min(100, Math.round((raised / target) * 100));
     };
 
-    const handleEditClick = (campaigner: Campaigner) => {
+    const getVerificationBadge = (status: string) => {
+        if (status === 'verified') return <VerifiedBadge size="sm" className="ml-1" />;
+
+        const styles: Record<string, string> = {
+            pending: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+            rejected: 'bg-red-100 text-red-700 border-red-200',
+            unverified: 'bg-gray-100 text-gray-600 border-gray-200',
+        };
+
+        const labels: Record<string, string> = {
+            verified: 'Terverifikasi',
+            pending: 'Menunggu',
+            rejected: 'Ditolak',
+            unverified: 'Belum Verifikasi',
+        };
+
+        return (
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${styles[status] || styles.unverified}`}>
+                {labels[status] || status}
+            </span>
+        );
+    };
+
+    const handleEditClick = async (campaigner: Campaigner) => {
+        let phoneNumber = campaigner.phone_number || '';
+
+        // If it's an organization member, try to get the organization's specific whatsapp
+        if (campaigner.organization_id) {
+            try {
+                const { data: org } = await supabase
+                    .from('organizations')
+                    .select('whatsapp_no')
+                    .eq('id', campaigner.organization_id)
+                    .single();
+
+                if (org?.whatsapp_no) {
+                    phoneNumber = org.whatsapp_no;
+                }
+            } catch (err) {
+                console.error('Error fetching org details', err);
+            }
+        }
+
         setEditingCampaigner(campaigner);
         setEditForm({
-            organization_name: campaigner.organization_name,
-            phone_number: campaigner.phone_number || '',
+            organization_name: campaigner.role === 'admin' ? 'Platform Administrator' : campaigner.organization_name,
+            phone_number: phoneNumber,
+            verification_status: campaigner.role === 'admin' ? 'verified' : campaigner.verification_status,
+            org_verification_status: campaigner.role === 'admin' ? 'verified' : (campaigner.org_verification_status || 'unverified')
         });
         setEditModalOpen(true);
     };
@@ -201,19 +250,35 @@ export default function CampaignersPage() {
 
         try {
             setSaving(true);
-            const { error } = await supabase
+            const { error: profileError } = await supabase
                 .from('profiles')
                 .update({
                     organization_name: editForm.organization_name,
                     phone: editForm.phone_number,
+                    verification_status: editForm.verification_status,
                 })
                 .eq('id', editingCampaigner.user_id);
 
-            if (error) throw error;
+            if (profileError) throw profileError;
+
+            if (editingCampaigner.organization_id) {
+                const { error: orgError } = await supabase
+                    .from('organizations')
+                    .update({
+                        name: editForm.organization_name,
+                        verification_status: editForm.org_verification_status,
+                        whatsapp_no: editForm.phone_number
+                    })
+                    .eq('id', editingCampaigner.organization_id);
+
+                if (orgError) throw orgError;
+            }
 
             // Refresh data
             await fetchCampaigners();
+            await refreshOrganizations();
             setEditModalOpen(false);
+            toast.success('Data campaigner berhasil diupdate');
         } catch (error) {
             console.error('Error updating campaigner:', error);
             toast.error('Gagal mengupdate data campaigner');
@@ -404,7 +469,19 @@ export default function CampaignersPage() {
                                                             {campaigner.organization_name?.charAt(0).toUpperCase() || '?'}
                                                         </div>
                                                         <div>
-                                                            <div className="font-medium text-gray-900">{campaigner.organization_name}</div>
+                                                            <div className="font-medium text-gray-900 flex flex-wrap items-center gap-2">
+                                                                {campaigner.role === 'admin' ? (
+                                                                    <span className="text-blue-600 font-bold flex items-center gap-1">
+                                                                        Platform Administrator
+                                                                        {getVerificationBadge('verified')}
+                                                                    </span>
+                                                                ) : (
+                                                                    <>
+                                                                        {campaigner.organization_name}
+                                                                        {getVerificationBadge(campaigner.organization_id ? (campaigner.org_verification_status || 'unverified') : campaigner.verification_status)}
+                                                                    </>
+                                                                )}
+                                                            </div>
                                                             <div className="text-xs text-gray-600">{campaigner.user_email}</div>
                                                         </div>
                                                     </div>
@@ -464,11 +541,24 @@ export default function CampaignersPage() {
                                                             <Edit2 className="w-4 h-4" />
                                                         </button>
                                                         <button
-                                                            onClick={() => navigate(`/donasi/campaigns?campaigner_id=${campaigner.user_id === 'unknown' ? 'null' : campaigner.user_id}`)}
+                                                            onClick={() => {
+                                                                if (campaigner.organization_id) {
+                                                                    navigate(`/donasi/campaigns?organization_id=${campaigner.organization_id}`);
+                                                                } else {
+                                                                    navigate(`/donasi/campaigns?campaigner_id=${campaigner.user_id === 'unknown' ? 'null' : campaigner.user_id}`);
+                                                                }
+                                                            }}
                                                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                                                             title="Lihat Campaigns"
                                                         >
                                                             <Eye className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => window.open(`/campaigner/${campaigner.user_id}`, '_blank')}
+                                                            className="p-1.5 text-gray-600 hover:bg-gray-50 rounded transition-colors"
+                                                            title="Lihat Profil Publik"
+                                                        >
+                                                            <ExternalLink className="w-4 h-4" />
                                                         </button>
                                                     </div>
                                                 </td>
@@ -551,6 +641,44 @@ export default function CampaignersPage() {
                                     placeholder="Contoh: 628123456789"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">Format: 628xxxxxxxxx (tanpa tanda +)</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    {editingCampaigner?.role === 'admin'
+                                        ? 'Status Verifikasi Platform'
+                                        : editingCampaigner?.organization_id
+                                            ? `Status Verifikasi Organisasi (${editingCampaigner.organization_name})`
+                                            : 'Status Verifikasi Akun'}
+                                </label>
+                                <select
+                                    value={editingCampaigner?.organization_id ? editForm.org_verification_status : editForm.verification_status}
+                                    onChange={(e) => {
+                                        const val = e.target.value as any;
+                                        if (editingCampaigner?.organization_id) {
+                                            setEditForm({ ...editForm, org_verification_status: val, verification_status: val });
+                                        } else {
+                                            setEditForm({ ...editForm, verification_status: val });
+                                        }
+                                    }}
+                                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${editingCampaigner?.organization_id ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
+                                        }`}
+                                    disabled={editingCampaigner?.role === 'admin'}
+                                >
+                                    <option value="unverified">Belum Verifikasi</option>
+                                    <option value="pending">Menunggu Konfirmasi</option>
+                                    <option value="verified">Terverifikasi</option>
+                                    <option value="rejected">Ditolak</option>
+                                </select>
+                                {editingCampaigner?.role === 'admin' ? (
+                                    <p className="mt-1 text-xs text-blue-600 italic">
+                                        * Akun Platform Administrator otomatis terverifikasi.
+                                    </p>
+                                ) : editingCampaigner?.organization_id && (
+                                    <p className="mt-1 text-[10px] text-blue-600 italic">
+                                        * Verifikasi organisasi akan muncul di semua campaign milik lembaga ini.
+                                    </p>
+                                )}
                             </div>
                         </div>
 

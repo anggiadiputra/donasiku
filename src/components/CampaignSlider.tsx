@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, CheckCircle } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { supabase, Campaign } from '../lib/supabase';
 import { createSlug } from '../utils/slug';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
+import { useAppName } from '../hooks/useAppName';
+import VerifiedBadge from './VerifiedBadge';
 
 import { isNetworkError, isDatabaseRelationshipError } from '../utils/errorHandling';
 import { CampaignSliderSkeleton } from './SkeletonLoader';
@@ -15,6 +17,7 @@ interface CampaignSliderProps {
 export default function CampaignSlider({ variant = 'primary' }: CampaignSliderProps) {
     const navigate = useNavigate();
     const primaryColor = usePrimaryColor();
+    const { appName } = useAppName();
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [loading, setLoading] = useState(true);
     const [sectionTitle, setSectionTitle] = useState('Pilihan Donasiku');
@@ -65,7 +68,7 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                 // 2. Fetch Campaigns based on settings
                 let query = supabase
                     .from('campaigns')
-                    .select('*, profiles:user_id(full_name, organization_name, avatar_url), organizations(name, logo_url)')
+                    .select('*, profiles:user_id(full_name, organization_name, avatar_url, role, verification_status), organizations(name, logo_url, verification_status)')
                     .eq('status', 'published')
                     .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 
@@ -100,7 +103,7 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
             } else {
                 const { data, error } = await supabase
                     .from('campaigns')
-                    .select('*, profiles:user_id(full_name, organization_name, avatar_url), organizations(name, logo_url)')
+                    .select('*, profiles:user_id(full_name, organization_name, avatar_url, role, verification_status), organizations(name, logo_url, verification_status)')
                     .eq('status', 'published')
                     .order('created_at', { ascending: false })
                     .limit(10);
@@ -121,7 +124,7 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                 console.warn('Falling back to basic query in Slider...');
                 const { data: fallbackData } = await supabase
                     .from('campaigns')
-                    .select('*')
+                    .select('*, profiles:user_id(full_name, organization_name, avatar_url, role, verification_status), organizations(name, logo_url, verification_status)')
                     .eq('status', 'published')
                     .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")')
                     .order('created_at', { ascending: false })
@@ -209,12 +212,15 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                                         <div className="flex items-center gap-1.5 mb-2">
                                             <span className="text-xs font-medium text-gray-600 truncate max-w-[140px]">
                                                 {/* @ts-ignore */}
-                                                {campaign.organizations?.name || campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Donasiku'}
+                                                {campaign.organizations?.name ||
+                                                    (campaign.profiles?.role === 'admin' ? (campaign.profiles?.organization_name || appName || campaign.profiles?.full_name || 'Donasiku') :
+                                                        (campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Donasiku'))}
                                             </span>
-                                            {campaign.is_verified && (
-                                                <CheckCircle className="w-3 h-3 text-blue-500 fill-current" />
-                                            )}
-                                            <span className="text-[10px] bg-blue-50 text-blue-600 px-1 rounded border border-blue-100 font-medium">ORG</span>
+                                            {/* @ts-ignore */}
+                                            {((campaign.organizations?.verification_status === 'verified') ||
+                                                (!campaign.organizations && (campaign.profiles?.verification_status === 'verified' || campaign.profiles?.role === 'admin'))) && (
+                                                    <VerifiedBadge size="sm" className="flex-shrink-0" />
+                                                )}
                                         </div>
 
                                         {/* Title */}

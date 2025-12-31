@@ -12,8 +12,10 @@ import {
   Coins,
   Users,
   UserCog,
-  MessageCircle
+  MessageCircle,
+  Banknote
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { useAppSettings } from '../hooks/useAppSettings';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { useOrganization } from '../context/OrganizationContext';
@@ -79,6 +81,11 @@ const menuItems: MenuItem[] = [
         path: '/donasi/fundraising'
       },
       {
+        label: 'Pencairan Dana',
+        icon: <Banknote className="w-4 h-4" />,
+        path: '/donasi/withdrawals'
+      },
+      {
         label: 'Settings',
         icon: <Settings className="w-4 h-4" />,
         path: '/donasi/settings'
@@ -127,9 +134,42 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const appInitial = appName.charAt(0).toUpperCase();
 
   const [finalMenuItems, setFinalMenuItems] = useState<MenuItem[]>(menuItems);
+  const [userRole, setUserRole] = useState<'admin' | 'campaigner'>('campaigner');
+
+  useEffect(() => {
+    const fetchRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+        setUserRole(profile?.role as any || 'campaigner');
+      }
+    };
+    fetchRole();
+  }, []);
 
   useEffect(() => {
     let items = [...menuItems];
+
+    // Filter based on role
+    items = items.map(item => {
+      if (item.label === 'Donasi' && item.subMenu) {
+        return {
+          ...item,
+          subMenu: item.subMenu.filter(sub => {
+            // Admin only items
+            const adminOnly = ['Campaigner', 'Analytics', 'Settings'];
+            if (userRole !== 'admin' && adminOnly.includes(sub.label)) return false;
+            return true;
+          })
+        };
+      }
+
+      // Global items for Admin
+      const adminOnlyGlobal = ['Zakat Settings', 'Infaq Settings', 'Fidyah Settings'];
+      if (userRole !== 'admin' && adminOnlyGlobal.includes(item.label)) return null;
+
+      return item;
+    }).filter((item): item is MenuItem => item !== null);
 
     if (selectedOrganization) {
       // Filter out global settings when in organization mode
@@ -167,7 +207,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
       }
     }
     setFinalMenuItems(items);
-  }, [selectedOrganization]);
+  }, [selectedOrganization, userRole]);
 
   // Auto-expand menu jika salah satu submenu aktif (kecuali Donasi yang sudah selalu expanded)
   useEffect(() => {

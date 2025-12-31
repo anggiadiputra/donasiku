@@ -211,7 +211,7 @@ export default function AnalyticsPage() {
                 <p className="text-sm text-gray-600">Total Donasi</p>
                 <TrendingUp className="w-5 h-5 text-green-600" />
               </div>
-              <p className="text-2xl font-bold text-gray-800">{loading ? <SkeletonBox className="h-8 w-32" /> : formatCurrency(summary.totalDonation)}</p>
+              <div className="text-2xl font-bold text-gray-800">{loading ? <SkeletonBox className="h-8 w-32" /> : formatCurrency(summary.totalDonation)}</div>
               <p className="text-xs text-gray-500 mt-1">Total donasi terkumpul</p>
             </div>
 
@@ -220,7 +220,7 @@ export default function AnalyticsPage() {
                 <p className="text-sm text-gray-600">Donatur Aktif</p>
                 <Users className="w-5 h-5 text-blue-600" />
               </div>
-              <p className="text-2xl font-bold text-gray-800">{loading ? <SkeletonBox className="h-8 w-24" /> : summary.totalDonors}</p>
+              <div className="text-2xl font-bold text-gray-800">{loading ? <SkeletonBox className="h-8 w-24" /> : summary.totalDonors}</div>
               <p className="text-xs text-gray-500 mt-1">Total donatur unik</p>
             </div>
 
@@ -229,7 +229,7 @@ export default function AnalyticsPage() {
                 <p className="text-sm text-gray-600">Rata-rata Donasi</p>
                 <DollarSign className="w-5 h-5 text-purple-600" />
               </div>
-              <p className="text-2xl font-bold text-gray-800">{loading ? <SkeletonBox className="h-8 w-32" /> : formatCurrency(summary.avgDonation)}</p>
+              <div className="text-2xl font-bold text-gray-800">{loading ? <SkeletonBox className="h-8 w-32" /> : formatCurrency(summary.avgDonation)}</div>
               <p className="text-xs text-gray-500 mt-1">Per transaksi</p>
             </div>
           </div>

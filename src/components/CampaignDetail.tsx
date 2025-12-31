@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Share2, MapPin, CheckCircle, MessageCircle, ArrowUp } from 'lucide-react';
+import { X, Share2, MapPin, MessageCircle, ArrowUp } from 'lucide-react';
 import { supabase, Campaign, Testimonial } from '../lib/supabase';
 import ShareModal from '../components/ShareModal';
+import VerifiedBadge from '../components/VerifiedBadge';
 
 interface CampaignDetailProps {
   campaign: Campaign | null;
@@ -106,12 +107,13 @@ export default function CampaignDetail({ campaign, isOpen, onClose }: CampaignDe
             </h1>
 
             <div className="flex items-center gap-2 mb-4">
-              {campaign.is_verified && (
-                <div className="flex items-center gap-1 text-blue-600">
-                  <CheckCircle className="w-5 h-5 fill-blue-600" />
-                  <span className="text-sm font-semibold">Terverifikasi</span>
-                </div>
-              )}
+              {((campaign.organizations?.verification_status === 'verified') ||
+                (!campaign.organizations && (campaign.profiles?.verification_status === 'verified' || campaign.profiles?.role === 'admin'))) && (
+                  <div className="flex items-center gap-1 text-blue-600">
+                    <VerifiedBadge size="md" />
+                    <span className="text-sm font-semibold">Identitas terverifikasi</span>
+                  </div>
+                )}
             </div>
 
             <div className="flex items-center gap-2 text-gray-600 mb-6 text-sm">
@@ -186,10 +188,16 @@ export default function CampaignDetail({ campaign, isOpen, onClose }: CampaignDe
                   RA
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-800">
+                  <p className="font-semibold text-gray-800 flex items-center gap-1">
                     {campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Donasiku'}
+                    {((campaign.organizations?.verification_status === 'verified') ||
+                      (!campaign.organizations && (campaign.profiles?.verification_status === 'verified' || campaign.profiles?.role === 'admin'))) && (
+                        <VerifiedBadge size="sm" />
+                      )}
                   </p>
-                  <p className="text-xs text-gray-500">Verified Organization</p>
+                  <p className="text-xs text-gray-500">
+                    {campaign.organizations ? 'Organisasi Terverifikasi' : 'Individu Terverifikasi'}
+                  </p>
                 </div>
               </div>
             </div>

@@ -27,6 +27,7 @@ interface Member {
         full_name: string;
         email: string;
         avatar_url: string;
+        role: string; // Platform-level role
     };
 }
 
@@ -52,6 +53,13 @@ export default function OrganizationSettingsPage() {
     const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member');
     const [loadingMembers, setLoadingMembers] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            setCurrentUserId(user?.id || null);
+        });
+    }, []);
 
     const publicUrl = selectedOrganization ? `${window.location.origin}/org/${selectedOrganization.slug}` : '';
 
@@ -103,14 +111,22 @@ export default function OrganizationSettingsPage() {
           profiles:user_id (
             full_name,
             email,
-            avatar_url
+            avatar_url,
+            role
           )
         `)
                 .eq('organization_id', selectedOrganization.id)
                 .order('created_at', { ascending: true });
 
             if (error) throw error;
-            setMembers(data as unknown as Member[]);
+
+            // Filter out platform admins from the member list
+            // Handle both object and array response for profiles join
+            const filteredMembers = (data as any[]).filter(m => {
+                const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+                return profile?.role !== 'admin';
+            });
+            setMembers(filteredMembers as unknown as Member[]);
         } catch (error) {
             console.error('Error fetching members:', error);
             toast.error('Gagal memuat daftar anggota');
@@ -205,6 +221,20 @@ export default function OrganizationSettingsPage() {
     const handleUpdateRole = async (memberId: string, newRole: string) => {
         if (!selectedOrganization) return;
         try {
+            // Check if user is modifying themselves
+            if (memberId === currentUserId) {
+                toast.error('Anda tidak dapat mengubah role Anda sendiri untuk mencegah hilangnya akses');
+                return;
+            }
+
+            // Check if the member being updated is an owner or platform admin
+            const memberToUpdate = members.find(m => m.id === memberId);
+            const profile = Array.isArray(memberToUpdate?.profiles) ? memberToUpdate?.profiles[0] : memberToUpdate?.profiles;
+            if (memberToUpdate?.role === 'owner' || profile?.role === 'admin') {
+                toast.error('Tidak dapat mengubah role pemilik atau administrator sistem');
+                return;
+            }
+
             const { error } = await supabase
                 .from('organization_members')
                 .update({ role: newRole })
@@ -224,6 +254,20 @@ export default function OrganizationSettingsPage() {
         if (!selectedOrganization) return;
 
         try {
+            // Check if user is removing themselves
+            if (memberId === currentUserId) {
+                toast.error('Anda tidak dapat menghapus akun Anda sendiri dari organisasi ini');
+                return;
+            }
+
+            // Check if the member being removed is an owner or platform admin
+            const memberToRemove = members.find(m => m.id === memberId);
+            const profile = Array.isArray(memberToRemove?.profiles) ? memberToRemove?.profiles[0] : memberToRemove?.profiles;
+            if (memberToRemove?.role === 'owner' || profile?.role === 'admin') {
+                toast.error('Tidak dapat menghapus pemilik atau administrator sistem');
+                return;
+            }
+
             const { error } = await supabase
                 .from('organization_members')
                 .delete()
@@ -334,7 +378,19 @@ export default function OrganizationSettingsPage() {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nama Organisasi</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
+                                    <span>Nama Organisasi</span>
+                                    {selectedOrganization?.verification_status === 'verified' ? (
+                                        <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 font-bold">
+                                            <Check className="w-3 h-3" />
+                                            TERVERIFIKASI
+                                        </span>
+                                    ) : (
+                                        <span className="text-[10px] text-gray-400 font-medium italic">
+                                            Identity {selectedOrganization?.verification_status || 'unverified'}
+                                        </span>
+                                    )}
+                                </label>
                                 <input
                                     type="text"
                                     value={orgName}
@@ -468,9 +524,13 @@ export default function OrganizationSettingsPage() {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-4">
-                                                {member.role === 'owner' ? (
-                                                    <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 capitalize">
-                                                        {member.role}
+                                                {(member.role === 'owner' ||
+                                                    (Array.isArray(member.profiles) ? member.profiles[0] : member.profiles)?.role === 'admin' ||
+                                                    member.user_id === currentUserId) ? (
+                                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${member.role === 'owner' ? 'bg-purple-100 text-purple-800' :
+                                                        member.user_id === currentUserId ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
+                                                        }`}>
+                                                        {member.role} {member.user_id === currentUserId && '(Anda)'}
                                                     </span>
                                                 ) : (
                                                     <select
@@ -483,15 +543,17 @@ export default function OrganizationSettingsPage() {
                                                         <option value="admin">Admin</option>
                                                     </select>
                                                 )}
-                                                {member.role !== 'owner' && (
-                                                    <button
-                                                        onClick={() => handleRemoveMember(member.id, member.profiles?.full_name)}
-                                                        className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
-                                                        title="Hapus Anggota"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                )}
+                                                {member.role !== 'owner' &&
+                                                    (Array.isArray(member.profiles) ? member.profiles[0] : member.profiles)?.role !== 'admin' &&
+                                                    member.user_id !== currentUserId && (
+                                                        <button
+                                                            onClick={() => handleRemoveMember(member.id, member.profiles?.full_name)}
+                                                            className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                                                            title="Hapus Anggota"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                             </div>
                                         </li>
                                     ))}

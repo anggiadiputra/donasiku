@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Share2 } from 'lucide-react';
 import { supabase, Campaign, Testimonial } from '../lib/supabase';
 import ShareModal from '../components/ShareModal';
+import VerifiedBadge from '../components/VerifiedBadge';
 
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -68,10 +69,18 @@ export default function CampaignPage() {
         .from('campaigns')
         .select(`
           *,
+          profiles:user_id (
+            full_name,
+            organization_name,
+            avatar_url,
+            verification_status,
+            role
+          ),
           organizations (
             name,
             logo_url,
-            slug
+            slug,
+            verification_status
           )
         `)
         .eq('slug', campaignSlug)
@@ -103,20 +112,14 @@ export default function CampaignPage() {
         }
 
         if (shouldShow) {
-          // Fetch profile to get latest organization name
-          if (data.user_id) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('organization_name, avatar_url')
-              .eq('id', data.user_id)
-              .single();
-
-            if (profile) {
-              // Only override if not already provided by organizations join
-              // @ts-ignore
-              if (!data.organizations) {
-                data.organization_name = profile.organization_name || data.organization_name;
-              }
+          // If profile returned by join, we don't need second query
+          // But we keep the fallback override logic for safety
+          if (!data.organizations) {
+            // Priority: Org Name in profile > Platform Name (for Admin) > Full Name > hardcoded
+            if (data.profiles?.role === 'admin') {
+              data.organization_name = data.profiles?.organization_name || appName || data.profiles?.full_name || 'Donasiku';
+            } else {
+              data.organization_name = data.profiles?.organization_name || data.profiles?.full_name || data.organization_name;
             }
           }
 
@@ -426,35 +429,37 @@ export default function CampaignPage() {
                 {/* Logo */}
                 <div className="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center overflow-hidden flex-shrink-0">
                   {/* @ts-ignore */}
-                  {(campaign.organizations?.logo_url || campaign.organization_logo) ? (
+                  {(campaign.organizations?.logo_url || campaign.organization_logo || campaign.profiles?.avatar_url) ? (
                     /* @ts-ignore */
-                    <img src={campaign.organizations?.logo_url || campaign.organization_logo} alt="Org" className="w-full h-full object-cover" />
+                    <img src={campaign.organizations?.logo_url || campaign.organization_logo || campaign.profiles?.avatar_url} alt="Org" className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-pink-500 font-bold text-lg">
                       {/* @ts-ignore */}
-                      {(campaign.organizations?.name || campaign.organization_name || appName || 'D').charAt(0)}
+                      {(campaign.organizations?.name || campaign.organization_name || campaign.profiles?.organization_name || campaign.profiles?.full_name || appName || 'D').charAt(0).toUpperCase()}
                     </span>
                   )}
                 </div>
 
                 {/* Name & Badge */}
-                <div>
+                <div className="flex-1">
                   <div className="flex items-center gap-1">
                     <span className="font-bold text-gray-900 text-sm">
                       {/* @ts-ignore */}
-                      {campaign.organizations?.name || campaign.profiles?.organization_name || campaign.organization_name || appName || 'Donasiku'}
+                      {campaign.organizations?.name || campaign.organization_name || campaign.profiles?.organization_name || campaign.profiles?.full_name || appName || 'Donasiku'}
                     </span>
-                    {/* Verified Badge */}
-                    <svg className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="none">
-                      <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.78 4.78 4 4 0 0 1-6.74 0 4 4 0 0 1-4.78-4.78 4 4 0 0 1 0-6.74Z" fill="currentColor" />
-                      <path d="m9 12 2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <span className="text-[10px] font-bold text-blue-500 border border-blue-200 rounded px-1 ml-1">
-                      ORG
-                    </span>
+                    {/* Verified Badge - Now using component */}
+                    {((campaign.organizations?.verification_status === 'verified') ||
+                      (!campaign.organizations && (campaign.profiles?.verification_status === 'verified' || campaign.profiles?.role === 'admin'))) && (
+                        <VerifiedBadge size="md" />
+                      )}
                   </div>
                   <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
-                    <span>Identitas terverifikasi</span>
+                    <span>
+                      {((campaign.organizations?.verification_status === 'verified') ||
+                        (!campaign.organizations && (campaign.profiles?.verification_status === 'verified' || campaign.profiles?.role === 'admin')))
+                        ? 'Identitas terverifikasi'
+                        : 'Identitas belum terverifikasi'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -651,6 +656,6 @@ export default function CampaignPage() {
         shareUrl={`${window.location.origin}${window.location.pathname}?utm_source=socialsharing_donor_web_campaign_detail&utm_medium=share_campaign_copas&utm_campaign=share_detail_campaign`}
         shareText={campaign ? `Bantu ${campaign.title} di Donasiku!` : 'Bantu campaign ini di Donasiku!'}
       />
-    </div>
+    </div >
   );
 }

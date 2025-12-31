@@ -16,7 +16,7 @@ export default function CampaignsPage() {
   const navigate = useNavigate();
   const { appName } = useAppName();
   const primaryColor = usePrimaryColor();
-  const { selectedOrganization } = useOrganization();
+  const { selectedOrganization, isPlatformAdmin } = useOrganization();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,18 +51,21 @@ export default function CampaignsPage() {
 
       let query = supabase
         .from('campaigns')
-        .select('*, profiles:user_id(full_name, organization_name), organizations(name, logo_url)', { count: 'exact' })
+        .select('*, profiles:user_id(full_name, organization_name, role), organizations(name, logo_url)', { count: 'exact' })
         // Exclude system campaigns
         .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")');
 
       const searchParams = new URLSearchParams(window.location.search);
       const campaignerId = searchParams.get('campaigner_id');
+      const organizationIdParam = searchParams.get('organization_id');
 
       if (searchQuery) {
         query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
       }
 
-      if (campaignerId) {
+      if (organizationIdParam) {
+        query = query.eq('organization_id', organizationIdParam);
+      } else if (campaignerId) {
         if (campaignerId === 'null') {
           query = query.is('user_id', null);
         } else {
@@ -81,16 +84,12 @@ export default function CampaignsPage() {
         if (selectedOrganization) {
           query = query.eq('organization_id', selectedOrganization.id);
         } else {
-          // Maybe check if Admin? If Admin and NO Filter, maybe show all? 
-          // But normally this page is "My Campaigns". 
-          // Let's filter by user_id if personal context
-          if (user) {
-            // Fetch profile to check role
-            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-            if (profile?.role !== 'admin') {
-              query = query.eq('user_id', user.id);
-            }
+          // Personal context filtering
+          // If NOT platform admin, restrict to user's own campaigns
+          if (!isPlatformAdmin && user) {
+            query = query.eq('user_id', user.id);
           }
+          // If isPlatformAdmin, we see ALL campaigns (Global Admin View in Personal mode)
         }
       }
 
@@ -527,7 +526,9 @@ export default function CampaignsPage() {
                             </td>
                             <td className="px-4 py-4 text-sm text-gray-600">
                               {/* @ts-ignore - joined data */}
-                              {campaign.organizations?.name || campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Rumah Anak Surga'}
+                              {campaign.organizations?.name ||
+                                (campaign.profiles?.role === 'admin' ? (campaign.profiles?.organization_name || appName || campaign.profiles?.full_name || 'Donasiku') :
+                                  (campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Donasiku'))}
                             </td>
                             <td className="px-4 py-4">
                               <div className="flex items-center gap-2">

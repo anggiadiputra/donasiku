@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, TrendingUp, Heart, Search, Eye, Trash2, Bell, LogOut, Menu, MessageCircle, Printer } from 'lucide-react';
+import { DollarSign, TrendingUp, Heart, Search, Eye, Trash2, Bell, LogOut, Menu, MessageCircle, Printer, AlertCircle, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -58,6 +58,11 @@ export default function DonasiDashboardPage() {
     const [showReceiptModal, setShowReceiptModal] = useState(false);
     const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
     const [userProfile, setUserProfile] = useState<any>(null);
+    const [loyalDonors, setLoyalDonors] = useState<any[]>([]);
+    const [withdrawalStats, setWithdrawalStats] = useState({
+        pending: 0,
+        completed: 0
+    });
 
     const { selectedOrganization } = useOrganization();
 
@@ -175,6 +180,32 @@ export default function DonasiDashboardPage() {
                 return sum + ((c.current_amount || 0) < (c.target_amount || 0) ? 1 : 0);
             }, 0) || 0;
 
+            // Fetch Withdrawal stats
+            const { data: wData } = await supabase
+                .from('withdrawals')
+                .select('amount, status, user_id');
+
+            let filteredWData = wData || [];
+            if (userProfile.role !== 'admin') {
+                filteredWData = filteredWData.filter(w => w.user_id === userProfile.id);
+            }
+
+            const wPending = filteredWData.filter(w => w.status === 'pending').reduce((sum, w) => sum + w.amount, 0) || 0;
+            const wCompleted = filteredWData.filter(w => w.status === 'completed').reduce((sum, w) => sum + w.amount, 0) || 0;
+
+            // Top Loyal Donors (for non-admins)
+            if (userProfile.role !== 'admin') {
+                const donorStats: Record<string, { name: string, total: number, count: number }> = {};
+                successTx.forEach(tx => {
+                    const key = tx.customer_phone || tx.customer_email || tx.customer_name;
+                    if (!donorStats[key]) donorStats[key] = { name: tx.customer_name, total: 0, count: 0 };
+                    donorStats[key].total += tx.amount;
+                    donorStats[key].count += 1;
+                });
+                const sortedDonors = Object.values(donorStats).sort((a, b) => b.total - a.total).slice(0, 5);
+                setLoyalDonors(sortedDonors);
+            }
+
             setTransactions(txData || []);
             setCampaigns(campaignsMap);
             setStats({
@@ -182,6 +213,10 @@ export default function DonasiDashboardPage() {
                 activePrograms: activePrograms,
                 totalDonors: uniqueDonors,
                 targetNotReached: notReachedSum,
+            });
+            setWithdrawalStats({
+                pending: wPending,
+                completed: wCompleted
             });
 
         } catch (error) {
@@ -343,6 +378,37 @@ export default function DonasiDashboardPage() {
                             <p className="text-gray-600">Kelola donasi dan program Anda</p>
                         </div>
 
+                        {/* Verification Status for Campaigner */}
+                        {userProfile?.role === 'campaigner' && userProfile?.verification_status !== 'verified' && (
+                            <div className={`mb-6 p-4 rounded-xl border flex flex-col md:flex-row items-center justify-between gap-4 ${userProfile?.verification_status === 'pending' ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'
+                                }`}>
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${userProfile?.verification_status === 'pending' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
+                                        }`}>
+                                        <AlertCircle className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-gray-900">
+                                            {userProfile?.verification_status === 'pending' ? 'Verifikasi Sedang Diproses' : 'Akun Belum Terverifikasi'}
+                                        </p>
+                                        <p className="text-sm text-gray-600">
+                                            {userProfile?.verification_status === 'pending'
+                                                ? 'Mohon tunggu, admin sedang meninjau dokumen Anda.'
+                                                : 'Verifikasi akun Anda untuk mendapatkan fitur penarikan dana dan lencana terpercaya.'}
+                                        </p>
+                                    </div>
+                                </div>
+                                {userProfile?.verification_status !== 'pending' && (
+                                    <button
+                                        onClick={() => navigate('/profile')}
+                                        className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors whitespace-nowrap"
+                                    >
+                                        Verifikasi Sekarang
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
                         {/* Stats Cards */}
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                             <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
@@ -384,7 +450,66 @@ export default function DonasiDashboardPage() {
                                 <p className="text-sm text-gray-600 mb-1">Perlu didorong</p>
                                 <p className="text-xl font-bold text-gray-800">{stats.targetNotReached}</p>
                             </div>
+
+                            {userProfile?.role === 'campaigner' && (
+                                <>
+                                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                                                <AlertCircle className="w-5 h-5 text-yellow-600" />
+                                            </div>
+                                        </div>
+                                        <p className="text-sm text-gray-600 mb-1">Pencairan Pending</p>
+                                        <p className="text-xl font-bold text-gray-800">{formatCurrency(withdrawalStats.pending)}</p>
+                                    </div>
+
+                                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                                                <Check className="w-5 h-5 text-purple-600" />
+                                            </div>
+                                        </div>
+                                        <p className="text-sm text-gray-600 mb-1">Total Dicairkan</p>
+                                        <p className="text-xl font-bold text-gray-800">{formatCurrency(withdrawalStats.completed)}</p>
+                                    </div>
+                                </>
+                            )}
                         </div>
+
+                        {userProfile?.role === 'campaigner' && loyalDonors.length > 0 && (
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                                <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                    {/* This space could be for charts or other info */}
+                                    <div className="p-6">
+                                        <h3 className="font-bold text-gray-800 mb-4">Grafik Donasi</h3>
+                                        <div className="h-48 flex items-center justify-center text-gray-400 border-2 border-dashed border-gray-100 rounded-xl">
+                                            Chart placeholder
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                    <div className="p-6 border-b border-gray-100">
+                                        <h3 className="font-bold text-gray-800">Donatur Setia</h3>
+                                    </div>
+                                    <div className="p-4 space-y-4">
+                                        {loyalDonors.map((donor, idx) => (
+                                            <div key={idx} className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                                                        {donor.name.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-semibold">{donor.name}</p>
+                                                        <p className="text-[10px] text-gray-500">{donor.count}x Donasi</p>
+                                                    </div>
+                                                </div>
+                                                <p className="text-sm font-bold text-gray-900">{formatCurrency(donor.total)}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Recent Donations Table */}
                         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">

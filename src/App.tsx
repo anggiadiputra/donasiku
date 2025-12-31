@@ -62,6 +62,7 @@ import ZiswafPage from './pages/ZiswafPage';
 import WhatsAppMessagesPage from './pages/WhatsAppMessagesPage';
 import DonatursPage from './pages/DonatursPage';
 import CampaignersPage from './pages/CampaignersPage';
+import WithdrawalsPage from './pages/WithdrawalsPage';
 import PrayersPage from './pages/PrayersPage';
 import CampaignsListPage from './pages/CampaignsListPage';
 import CampaignDonorsPage from './pages/CampaignDonorsPage';
@@ -76,6 +77,7 @@ import OrganizationSettingsPage from './pages/organizations/OrganizationSettings
 import OrganizationProfilePage from './pages/organizations/OrganizationProfilePage';
 import OrganizationExplorePage from './pages/organizations/OrganizationExplorePage';
 import ProfilePage from './pages/ProfilePage';
+import CampaignerProfilePage from './pages/CampaignerProfilePage';
 
 import { usePageTitle } from './hooks/usePageTitle';
 import { useAppName } from './hooks/useAppName';
@@ -188,6 +190,7 @@ function AppContent() {
       <Route path="/fidyah/donasi" element={<FidyahDonationsPage />} />
       <Route path="/ziswaf" element={<ZiswafPage />} />
       <Route path="/prayers" element={<PrayersPage />} />
+      <Route path="/campaigner/:id" element={<CampaignerProfilePage />} />
 
       {/* Dashboard Routes - Wrapped in ProtectedRoute */}
       <Route
@@ -243,6 +246,14 @@ function AppContent() {
         element={
           <ProtectedRoute>
             <CampaignersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/donasi/withdrawals"
+        element={
+          <ProtectedRoute>
+            <WithdrawalsPage />
           </ProtectedRoute>
         }
       />

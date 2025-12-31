@@ -14,6 +14,35 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+export interface Profile {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url?: string;
+  role: string;
+  organization_name?: string;
+  phone?: string;
+  verification_status?: 'unverified' | 'pending' | 'verified' | 'rejected';
+  bio?: string;
+  social_links?: Record<string, string>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url?: string | null;
+  owner_id?: string;
+  description?: string;
+  location?: string;
+  whatsapp_no?: string;
+  verification_status?: 'unverified' | 'pending' | 'verified' | 'rejected';
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Campaign {
   id: string;
   title: string;
@@ -42,11 +71,8 @@ export interface Campaign {
   is_featured?: boolean;
   created_at: string;
   updated_at: string;
-  profiles?: {
-    full_name: string;
-    organization_name?: string;
-    avatar_url?: string;
-  };
+  profiles?: Partial<Profile>;
+  organizations?: Partial<Organization>;
 }
 
 export interface Category {
@@ -56,6 +82,25 @@ export interface Category {
   icon: string;
   description: string;
   created_at: string;
+}
+
+export interface Withdrawal {
+  id: string;
+  user_id: string;
+  campaign_id: string;
+  amount: number;
+  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  bank_info: {
+    bank_name: string;
+    account_number: string;
+    account_holder: string;
+  };
+  admin_note?: string;
+  receipt_url?: string;
+  created_at: string;
+  updated_at: string;
+  campaigns?: Partial<Campaign>;
+  profiles?: Partial<Profile>;
 }
 
 export interface Donation {

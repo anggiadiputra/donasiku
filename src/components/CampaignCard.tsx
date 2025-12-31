@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Flame } from 'lucide-react';
+import { Flame } from 'lucide-react';
 import { Campaign } from '../lib/supabase';
 import { createSlug } from '../utils/slug';
 import { usePrimaryColor } from '../hooks/usePrimaryColor';
+import { useAppName } from '../hooks/useAppName';
+import VerifiedBadge from './VerifiedBadge';
 
 interface CampaignCardProps {
   campaign: Campaign;
@@ -12,6 +14,7 @@ interface CampaignCardProps {
 export default function CampaignCard({ campaign, onClick }: CampaignCardProps) {
   const navigate = useNavigate();
   const primaryColor = usePrimaryColor();
+  const { appName } = useAppName();
 
   const handleCardClick = () => {
     if (onClick) {
@@ -93,20 +96,15 @@ export default function CampaignCard({ campaign, onClick }: CampaignCardProps) {
           <div className="flex items-center gap-1.5 mb-1 flex-wrap">
             <span className="text-xs text-gray-700 truncate">
               {/* @ts-ignore */}
-              {campaign.organizations?.name || campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Donasiku'}
+              {campaign.organizations?.name ||
+                (campaign.profiles?.role === 'admin' ? (campaign.profiles?.organization_name || appName || campaign.profiles?.full_name || 'Donasiku') :
+                  (campaign.profiles?.organization_name || campaign.profiles?.full_name || campaign.organization_name || 'Donasiku'))}
             </span>
-            {campaign.is_verified && (
-              <CheckCircle className="w-3 h-3 text-white flex-shrink-0" style={{ fill: primaryColor }} />
-            )}
-            <span
-              className="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
-              style={{
-                backgroundColor: `${primaryColor}20`,
-                color: primaryColor
-              }}
-            >
-              ORG
-            </span>
+            {/* @ts-ignore */}
+            {((campaign.organizations?.verification_status === 'verified') ||
+              (!campaign.organizations && (campaign.profiles?.verification_status === 'verified' || campaign.profiles?.role === 'admin'))) && (
+                <VerifiedBadge size="sm" className="flex-shrink-0" />
+              )}
           </div>
 
           <h3 className="font-bold text-gray-800 mb-2 line-clamp-2 text-sm leading-tight">

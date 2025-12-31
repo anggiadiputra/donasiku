@@ -52,7 +52,7 @@ export default function OrganizationExplorePage() {
 
             const { data: campaignList, error: campaignsError } = await supabase
                 .from('campaigns')
-                .select('*')
+                .select('*, profiles:user_id(role), organizations(name, logo_url)')
                 .eq('organization_id', org.id)
                 .eq('status', 'published')
                 .order('created_at', { ascending: false })
@@ -78,7 +78,7 @@ export default function OrganizationExplorePage() {
 
             const { data: moreCampaigns, error } = await supabase
                 .from('campaigns')
-                .select('*')
+                .select('*, profiles:user_id(role), organizations(name, logo_url)')
                 .eq('organization_id', organization.id)
                 .eq('status', 'published')
                 .order('created_at', { ascending: false })

@@ -6,6 +6,7 @@ import { usePrimaryColor } from '../hooks/usePrimaryColor';
 import { User, Camera, Save, Loader2, Mail, Phone, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { uploadToS3ViaAPI } from '../utils/s3Storage';
+import VerifiedBadge from '../components/VerifiedBadge';
 
 export default function ProfilePage() {
     usePageTitle('Profil Saya');
@@ -21,6 +22,13 @@ export default function ProfilePage() {
     const [fullName, setFullName] = useState('');
     const [phone, setPhone] = useState('');
     const [avatarUrl, setAvatarUrl] = useState('');
+    const [bio, setBio] = useState('');
+    const [socialLinks, setSocialLinks] = useState<any>({
+        website: '',
+        instagram: '',
+        facebook: '',
+        twitter: ''
+    });
 
     useEffect(() => {
         fetchProfile();
@@ -46,6 +54,13 @@ export default function ProfilePage() {
                 setFullName(data.full_name || '');
                 setPhone(data.phone || '');
                 setAvatarUrl(data.avatar_url || '');
+                setBio(data.bio || '');
+                setSocialLinks({
+                    website: data.social_links?.website || '',
+                    instagram: data.social_links?.instagram || '',
+                    facebook: data.social_links?.facebook || '',
+                    twitter: data.social_links?.twitter || ''
+                });
             }
         } catch (error: any) {
             console.error('Error fetching profile:', error);
@@ -100,6 +115,8 @@ export default function ProfilePage() {
                     full_name: fullName,
                     phone: phone,
                     avatar_url: avatarUrl,
+                    bio: bio,
+                    social_links: socialLinks,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', profile.id);
@@ -162,9 +179,35 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="pt-16 p-8">
-                        <div className="mb-8">
-                            <h2 className="text-2xl font-bold text-gray-800">Pengaturan Profil</h2>
-                            <p className="text-gray-500 text-sm">Kelola informasi diri dan foto profil Anda</p>
+                        <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-800">Pengaturan Profil</h2>
+                                <p className="text-gray-500 text-sm">Kelola informasi diri dan foto profil Anda</p>
+                            </div>
+                            {profile?.verification_status && (
+                                <div className={`px-4 py-2 rounded-lg border text-sm font-semibold flex items-center gap-2 ${(profile.verification_status === 'verified' || profile.role === 'admin') ? 'bg-green-50 text-green-700 border-green-100' :
+                                    profile.verification_status === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-100' :
+                                        profile.verification_status === 'rejected' ? 'bg-red-50 text-red-700 border-red-100' :
+                                            'bg-gray-50 text-gray-600 border-gray-100'
+                                    }`}>
+                                    <div className={`w-2 h-2 rounded-full ${(profile.verification_status === 'verified' || profile.role === 'admin') ? 'bg-green-500' :
+                                        profile.verification_status === 'pending' ? 'bg-yellow-500' :
+                                            profile.verification_status === 'rejected' ? 'bg-red-500' :
+                                                'bg-gray-400'
+                                        }`}></div>
+                                    Status Akun: {
+                                        (profile.verification_status === 'verified' || profile.role === 'admin') ? (
+                                            <span className="flex items-center gap-1">
+                                                Terverifikasi
+                                                <VerifiedBadge size="sm" />
+                                            </span>
+                                        ) :
+                                            profile.verification_status === 'pending' ? 'Dalam Tinjauan' :
+                                                profile.verification_status === 'rejected' ? 'Ditolak' :
+                                                    'Belum Verifikasi'
+                                    }
+                                </div>
+                            )}
                         </div>
 
                         <form onSubmit={handleSave} className="space-y-6">
@@ -224,6 +267,7 @@ export default function ProfilePage() {
                                         />
                                     </div>
                                 </div>
+
                             </div>
 
                             <div className="flex justify-end pt-4 border-t border-gray-100">
