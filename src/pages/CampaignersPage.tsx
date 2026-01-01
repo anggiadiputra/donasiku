@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Menu, Bell, LogOut, Users, Target, DollarSign, Edit2, Eye, X, ExternalLink } from 'lucide-react';
+import { Search, Menu, Bell, LogOut, Users, Target, DollarSign, Edit2, Eye, X, ExternalLink, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -13,6 +13,7 @@ import VerifiedBadge from '../components/VerifiedBadge';
 interface Campaigner {
     user_id: string;
     user_email: string;
+    full_name: string; // Added field
     organization_name: string;
     phone_number?: string;
     verification_status: 'unverified' | 'pending' | 'verified' | 'rejected';
@@ -45,11 +46,106 @@ export default function CampaignersPage() {
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingCampaigner, setEditingCampaigner] = useState<Campaigner | null>(null);
     const [editForm, setEditForm] = useState({
+        full_name: '', // Added
         organization_name: '',
         phone_number: '',
         verification_status: 'unverified' as any,
         org_verification_status: 'unverified' as any
     });
+
+    // ...
+
+    const handleEditClick = async (campaigner: Campaigner) => {
+        let phoneNumber = campaigner.phone_number || '';
+
+        // Use existing logic for phone number...
+        if (campaigner.organization_id) {
+            try {
+                const { data: org } = await supabase
+                    .from('organizations')
+                    .select('whatsapp_no')
+                    .eq('id', campaigner.organization_id)
+                    .single();
+
+                if (org?.whatsapp_no) {
+                    phoneNumber = org.whatsapp_no;
+                }
+            } catch (err) {
+                console.error('Error fetching org details', err);
+            }
+        }
+
+        setEditingCampaigner(campaigner);
+        setEditForm({
+            full_name: campaigner.full_name || '', // Populate
+            organization_name: campaigner.organization_name || '',
+            phone_number: phoneNumber,
+            verification_status: campaigner.role === 'admin' ? 'verified' : campaigner.verification_status,
+            org_verification_status: campaigner.role === 'admin' ? 'verified' : (campaigner.org_verification_status || 'unverified')
+        });
+        setEditModalOpen(true);
+    };
+
+    // ...
+
+    const handleSaveEdit = async () => {
+        if (!editingCampaigner) return;
+
+        try {
+            setSaving(true);
+
+            // Update profile
+            const { error: profileError } = await supabase
+                .from('profiles')
+                .update({
+                    full_name: editForm.full_name, // Update full_name
+                    // organization_name also here? No, let's keep it consistent.
+                    // If independent, organization_name IS the display name.
+                    // If org member, organization_name is ignored by UI (uses Org Table), but maybe good to sync?
+                    // Let's stick to consistent separate updates.
+                    verification_status: editForm.verification_status
+                })
+                .eq('id', editingCampaigner.user_id);
+
+            if (profileError) throw profileError;
+
+            // Update organization Name and Verification if applicable
+            if (editingCampaigner.organization_id) {
+                const { error: orgError } = await supabase
+                    .from('organizations')
+                    .update({
+                        name: editForm.organization_name,
+                        verification_status: editForm.org_verification_status,
+                        whatsapp_no: editForm.phone_number
+                    })
+                    .eq('id', editingCampaigner.organization_id);
+
+                if (orgError) throw orgError;
+            } else {
+                // Independent Campaigner - update organization_name in profile as well?
+                // Usually independent uses organization_name as their display name too?
+                // Or we rely on full_name?
+                // Existing logic updated organization_name in profile. Let's keep it.
+                const { error: indepError } = await supabase
+                    .from('profiles')
+                    .update({
+                        organization_name: editForm.organization_name
+                    })
+                    .eq('id', editingCampaigner.user_id);
+                if (indepError) throw indepError;
+            }
+
+            await fetchCampaigners();
+            await refreshOrganizations();
+            setEditModalOpen(false);
+            toast.success('Data campaigner berhasil diupdate');
+        } catch (error: any) {
+            console.error('Error updating campaigner:', error);
+            toast.error('Gagal mengupdate campaigner: ' + error.message);
+        } finally {
+            setSaving(false);
+        }
+    };
     const [saving, setSaving] = useState(false);
 
     const handleLogout = async () => {
@@ -72,7 +168,7 @@ export default function CampaignersPage() {
                 // Fetch ALL members of the organization
                 const { data: members, error: memberError } = await supabase
                     .from('organization_members')
-                    .select('user_id, role, created_at, profiles:user_id(id, email, phone, organization_name, verification_status, role, bio), organizations(id, verification_status)')
+                    .select('user_id, role, created_at, profiles:user_id(id, email, full_name, phone, organization_name, verification_status, role, bio), organizations(id, verification_status)')
                     .eq('organization_id', selectedOrganization.id);
 
                 if (memberError) throw memberError;
@@ -111,6 +207,7 @@ export default function CampaignersPage() {
                     campaignerMap.set(userId, {
                         user_id: userId,
                         user_email: profile?.email || '-',
+                        full_name: profile?.full_name || '',
                         organization_name: profile?.organization_name || selectedOrganization.name,
                         phone_number: profile?.phone || '',
                         verification_status: profile?.verification_status || 'unverified',
@@ -144,8 +241,9 @@ export default function CampaignersPage() {
 
                 const mappedCampaigners: Campaigner[] = data.map((d: any) => ({
                     user_id: d.user_id,
-                    user_email: d.email,
-                    organization_name: d.organization_name,
+                    user_email: d.email || '-',
+                    full_name: d.full_name || '',
+                    organization_name: d.organization_name || 'Individual',
                     phone_number: d.phone_number,
                     verification_status: d.verification_status,
                     bio: d.bio,
@@ -213,78 +311,6 @@ export default function CampaignersPage() {
                 {labels[status] || status}
             </span>
         );
-    };
-
-    const handleEditClick = async (campaigner: Campaigner) => {
-        let phoneNumber = campaigner.phone_number || '';
-
-        // If it's an organization member, try to get the organization's specific whatsapp
-        if (campaigner.organization_id) {
-            try {
-                const { data: org } = await supabase
-                    .from('organizations')
-                    .select('whatsapp_no')
-                    .eq('id', campaigner.organization_id)
-                    .single();
-
-                if (org?.whatsapp_no) {
-                    phoneNumber = org.whatsapp_no;
-                }
-            } catch (err) {
-                console.error('Error fetching org details', err);
-            }
-        }
-
-        setEditingCampaigner(campaigner);
-        setEditForm({
-            organization_name: campaigner.role === 'admin' ? 'Platform Administrator' : campaigner.organization_name,
-            phone_number: phoneNumber,
-            verification_status: campaigner.role === 'admin' ? 'verified' : campaigner.verification_status,
-            org_verification_status: campaigner.role === 'admin' ? 'verified' : (campaigner.org_verification_status || 'unverified')
-        });
-        setEditModalOpen(true);
-    };
-
-    const handleSaveEdit = async () => {
-        if (!editingCampaigner) return;
-
-        try {
-            setSaving(true);
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .update({
-                    organization_name: editForm.organization_name,
-                    phone: editForm.phone_number,
-                    verification_status: editForm.verification_status,
-                })
-                .eq('id', editingCampaigner.user_id);
-
-            if (profileError) throw profileError;
-
-            if (editingCampaigner.organization_id) {
-                const { error: orgError } = await supabase
-                    .from('organizations')
-                    .update({
-                        name: editForm.organization_name,
-                        verification_status: editForm.org_verification_status,
-                        whatsapp_no: editForm.phone_number
-                    })
-                    .eq('id', editingCampaigner.organization_id);
-
-                if (orgError) throw orgError;
-            }
-
-            // Refresh data
-            await fetchCampaigners();
-            await refreshOrganizations();
-            setEditModalOpen(false);
-            toast.success('Data campaigner berhasil diupdate');
-        } catch (error) {
-            console.error('Error updating campaigner:', error);
-            toast.error('Gagal mengupdate data campaigner');
-        } finally {
-            setSaving(false);
-        }
     };
 
     const filteredCampaigners = campaigners.filter((campaigner) =>
@@ -470,17 +496,16 @@ export default function CampaignersPage() {
                                                         </div>
                                                         <div>
                                                             <div className="font-medium text-gray-900 flex flex-wrap items-center gap-2">
-                                                                {campaigner.role === 'admin' ? (
-                                                                    <span className="text-blue-600 font-bold flex items-center gap-1">
-                                                                        Platform Administrator
-                                                                        {getVerificationBadge('verified')}
+                                                                {campaigner.organization_name}
+                                                                {campaigner.role === 'admin' && (
+                                                                    <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded border border-purple-200 uppercase font-bold tracking-wider">
+                                                                        ADMIN
                                                                     </span>
-                                                                ) : (
-                                                                    <>
-                                                                        {campaigner.organization_name}
-                                                                        {getVerificationBadge(campaigner.organization_id ? (campaigner.org_verification_status || 'unverified') : campaigner.verification_status)}
-                                                                    </>
                                                                 )}
+                                                                {getVerificationBadge(campaigner.organization_id ? (campaigner.org_verification_status || 'unverified') : campaigner.verification_status)}
+                                                            </div>
+                                                            <div className="text-xs text-gray-500 font-medium">
+                                                                {campaigner.full_name}
                                                             </div>
                                                             <div className="text-xs text-gray-600">{campaigner.user_email}</div>
                                                         </div>
@@ -616,6 +641,32 @@ export default function CampaignersPage() {
 
                         {/* Modal Body */}
                         <div className="p-6 space-y-4">
+                            {editingCampaigner?.organization_id && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 flex gap-2 items-start">
+                                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <span className="font-bold block mb-1">Perhatian:</span>
+                                        Anda sedang mengubah data <strong>Organisasi</strong>. Perubahan nama atau nomor WhatsApp akan berdampak pada seluruh anggota yang terhubung ke organisasi ini.
+                                    </div>
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Nama Lengkap (Personal)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editForm.full_name}
+                                    onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Nama Lengkap Personal"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Mengubah nama ini hanya akan mengubah profil pengguna ini saja.
+                                </p>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Nama Organisasi

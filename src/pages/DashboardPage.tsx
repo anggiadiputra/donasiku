@@ -269,30 +269,60 @@ export default function DashboardPage() {
 
 
       // Calculate Revenue Breakdown
-      const categories: Record<string, { value: number, color: string }> = {
-        'Zakat': { value: 0, color: '#10B981' },
-        'Infaq': { value: 0, color: '#3B82F6' },
-        'Fidyah': { value: 0, color: '#F59E0B' },
-        'Donasi': { value: 0, color: primaryColor || '#111827' }
-      };
+      let breakdown: { name: string; value: number; color: string; percentage: number }[] = [];
 
-      periodTx.forEach((tx: any) => {
-        const details = (tx.product_details || '').toLowerCase();
-        if (details.includes('zakat')) categories['Zakat'].value += tx.amount;
-        else if (details.includes('infaq')) categories['Infaq'].value += tx.amount;
-        else if (details.includes('fidyah')) categories['Fidyah'].value += tx.amount;
-        else categories['Donasi'].value += tx.amount;
-      });
+      if (selectedOrganization || (!isAdmin && userProfile?.role === 'campaigner')) {
+        // Organization / Campaigner View: Top 5 Campaigns
+        const campaignRevenue: Record<string, number> = {};
 
-      const totalRev = Object.values(categories).reduce((acc, curr) => acc + curr.value, 0) || 1;
-      const breakdown = Object.entries(categories)
-        .map(([name, data]) => ({
-          name,
-          value: data.value,
-          color: data.color,
-          percentage: Math.round((data.value / totalRev) * 100)
-        }))
-        .sort((a, b) => b.value - a.value);
+        periodTx.forEach((tx: any) => {
+          // Use campaign title if available, otherwise 'General'
+          const title = tx.campaigns?.title || 'General';
+          campaignRevenue[title] = (campaignRevenue[title] || 0) + tx.amount;
+        });
+
+        // Convert to array and sort
+        const sortedCampaigns = Object.entries(campaignRevenue)
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 5); // Take top 5
+
+        const colors = ['#10B981', '#3B82F6', '#F59E0B', '#6366F1', '#EC4899'];
+
+        breakdown = sortedCampaigns.map((item, index) => ({
+          name: item.name,
+          value: item.value,
+          color: colors[index % colors.length],
+          percentage: totalDonation > 0 ? Math.round((item.value / totalDonation) * 100) : 0
+        }));
+
+      } else {
+        // Admin / Default View: by Category (Zakat/Infaq/etc)
+        const categories: Record<string, { value: number, color: string }> = {
+          'Zakat': { value: 0, color: '#10B981' },
+          'Infaq': { value: 0, color: '#3B82F6' },
+          'Fidyah': { value: 0, color: '#F59E0B' },
+          'Donasi': { value: 0, color: primaryColor || '#111827' }
+        };
+
+        periodTx.forEach((tx: any) => {
+          const details = (tx.product_details || '').toLowerCase();
+          if (details.includes('zakat')) categories['Zakat'].value += tx.amount;
+          else if (details.includes('infaq')) categories['Infaq'].value += tx.amount;
+          else if (details.includes('fidyah')) categories['Fidyah'].value += tx.amount;
+          else categories['Donasi'].value += tx.amount;
+        });
+
+        const totalRev = Object.values(categories).reduce((acc, curr) => acc + curr.value, 0) || 1;
+        breakdown = Object.entries(categories)
+          .map(([name, data]) => ({
+            name,
+            value: data.value,
+            color: data.color,
+            percentage: Math.round((data.value / totalRev) * 100)
+          }))
+          .sort((a, b) => b.value - a.value);
+      }
 
       setBreakdownData(breakdown);
       setTrendData(chartData);

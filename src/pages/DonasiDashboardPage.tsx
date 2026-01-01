@@ -378,36 +378,50 @@ export default function DonasiDashboardPage() {
                             <p className="text-gray-600">Kelola donasi dan program Anda</p>
                         </div>
 
-                        {/* Verification Status for Campaigner */}
-                        {userProfile?.role === 'campaigner' && userProfile?.verification_status !== 'verified' && (
-                            <div className={`mb-6 p-4 rounded-xl border flex flex-col md:flex-row items-center justify-between gap-4 ${userProfile?.verification_status === 'pending' ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'
-                                }`}>
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${userProfile?.verification_status === 'pending' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
-                                        }`}>
-                                        <AlertCircle className="w-6 h-6" />
+                        {/* Verification Status for Campaigner or Organization */}
+                        {(userProfile?.role === 'campaigner' || (selectedOrganization && selectedOrganization.verification_status !== 'verified')) &&
+                            (selectedOrganization ? selectedOrganization.verification_status : userProfile?.verification_status) !== 'verified' &&
+                            /* Don't show if Platform Admin is viewing unless it's impactful? Actually Platform Admin has role='admin', so first check handles it.
+                               But if Platform Admin switches to Org view, userProfile.role is 'admin'. 
+                               So `userProfile?.role === 'campaigner'` prevents Platform Admin from seeing this.
+                               If Org Owner sees this, their role is 'campaigner'. matches.
+                               If I am Org Owner, I want to see Org Status.
+                            */
+                            (
+                                <div className={`mb-6 p-4 rounded-xl border flex flex-col md:flex-row items-center justify-between gap-4 ${(selectedOrganization ? selectedOrganization.verification_status : userProfile?.verification_status) === 'pending'
+                                        ? 'bg-amber-50 border-amber-200'
+                                        : 'bg-red-50 border-red-200'
+                                    }`}>
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${(selectedOrganization ? selectedOrganization.verification_status : userProfile?.verification_status) === 'pending'
+                                                ? 'bg-amber-100 text-amber-600'
+                                                : 'bg-red-100 text-red-600'
+                                            }`}>
+                                            <AlertCircle className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-gray-900">
+                                                {(selectedOrganization ? selectedOrganization.verification_status : userProfile?.verification_status) === 'pending'
+                                                    ? 'Verifikasi Sedang Diproses'
+                                                    : (selectedOrganization ? 'Organisasi Belum Terverifikasi' : 'Akun Belum Terverifikasi')}
+                                            </p>
+                                            <p className="text-sm text-gray-600">
+                                                {(selectedOrganization ? selectedOrganization.verification_status : userProfile?.verification_status) === 'pending'
+                                                    ? 'Mohon tunggu, admin sedang meninjau dokumen Anda.'
+                                                    : 'Verifikasi akun Anda untuk mendapatkan fitur penarikan dana dan lencana terpercaya.'}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="font-bold text-gray-900">
-                                            {userProfile?.verification_status === 'pending' ? 'Verifikasi Sedang Diproses' : 'Akun Belum Terverifikasi'}
-                                        </p>
-                                        <p className="text-sm text-gray-600">
-                                            {userProfile?.verification_status === 'pending'
-                                                ? 'Mohon tunggu, admin sedang meninjau dokumen Anda.'
-                                                : 'Verifikasi akun Anda untuk mendapatkan fitur penarikan dana dan lencana terpercaya.'}
-                                        </p>
-                                    </div>
+                                    {(selectedOrganization ? selectedOrganization.verification_status : userProfile?.verification_status) !== 'pending' && (
+                                        <button
+                                            onClick={() => navigate(selectedOrganization ? '/organizations/settings' : '/profile')}
+                                            className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors whitespace-nowrap"
+                                        >
+                                            Verifikasi Sekarang
+                                        </button>
+                                    )}
                                 </div>
-                                {userProfile?.verification_status !== 'pending' && (
-                                    <button
-                                        onClick={() => navigate('/profile')}
-                                        className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors whitespace-nowrap"
-                                    >
-                                        Verifikasi Sekarang
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                            )}
 
                         {/* Stats Cards */}
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
