@@ -560,7 +560,7 @@ export default function CampaignersPage() {
                                                     <div className="flex items-center gap-2">
                                                         <button
                                                             onClick={() => handleEditClick(campaigner)}
-                                                            className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                                            className="flex items-center justify-center w-8 h-8 text-green-600 bg-white border border-green-200 rounded-lg shadow-sm hover:bg-green-50 hover:border-green-300 transition-all active:scale-95"
                                                             title="Edit Campaigner"
                                                         >
                                                             <Edit2 className="w-4 h-4" />
@@ -573,14 +573,14 @@ export default function CampaignersPage() {
                                                                     navigate(`/donasi/campaigns?campaigner_id=${campaigner.user_id === 'unknown' ? 'null' : campaigner.user_id}`);
                                                                 }
                                                             }}
-                                                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                            className="flex items-center justify-center w-8 h-8 text-blue-600 bg-white border border-blue-200 rounded-lg shadow-sm hover:bg-blue-50 hover:border-blue-300 transition-all active:scale-95"
                                                             title="Lihat Campaigns"
                                                         >
                                                             <Eye className="w-4 h-4" />
                                                         </button>
                                                         <button
                                                             onClick={() => window.open(`/campaigner/${campaigner.user_id}`, '_blank')}
-                                                            className="p-1.5 text-gray-600 hover:bg-gray-50 rounded transition-colors"
+                                                            className="flex items-center justify-center w-8 h-8 text-gray-600 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all active:scale-95"
                                                             title="Lihat Profil Publik"
                                                         >
                                                             <ExternalLink className="w-4 h-4" />
