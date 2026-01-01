@@ -97,6 +97,8 @@ export default function CampaignsListPage() {
       }
 
       const { data, error } = await query
+        .order('is_featured', { ascending: false })
+        .order('is_urgent', { ascending: false })
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -128,6 +130,8 @@ export default function CampaignsListPage() {
           }
 
           const { data: allData, error: allError } = await altQuery
+            .order('is_featured', { ascending: false })
+            .order('is_urgent', { ascending: false })
             .order('created_at', { ascending: false })
             .range(from, to);
 

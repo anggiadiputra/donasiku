@@ -102,7 +102,7 @@ export default function DashboardPage() {
 
       // Determine Date Range
       const now = new Date();
-      let startDate = new Date();
+      const startDate = new Date();
 
       if (timeframe === 'Weekly') {
         startDate.setDate(now.getDate() - 7);

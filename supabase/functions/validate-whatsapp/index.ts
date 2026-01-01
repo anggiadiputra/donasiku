@@ -54,7 +54,7 @@ serve(async (req: Request) => {
     const isRegistered = data.registered && data.registered.some((p: string) => {
       // Fonnte might return number with @c.us or just digits.
       // Assuming it returns digits (based on docs usually 628xxx)
-      let normalizedRegistered = p.replace(/\D/g, '');
+      const normalizedRegistered = p.replace(/\D/g, '');
       return normalizedRegistered === normalizedInput;
     });
 

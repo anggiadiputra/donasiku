@@ -7,7 +7,11 @@ import {
   Calendar,
   Save,
   Send,
-  Flame
+  Flame,
+  Plus,
+  Edit2,
+  Trash2,
+  Megaphone
 } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { supabase, Category, Campaign } from '../lib/supabase';
@@ -15,6 +19,7 @@ import { uploadToS3 } from '../utils/s3Storage';
 import { createSlug } from '../utils/slug';
 
 import RichTextEditor from '../components/RichTextEditor';
+import CreateUpdateModal from '../components/CreateUpdateModal';
 
 export default function EditCampaignPage() {
   const navigate = useNavigate();
@@ -43,6 +48,11 @@ export default function EditCampaignPage() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [showAddCategory, setShowAddCategory] = useState(false);
 
+
+  // Updates Management
+  const [updates, setUpdates] = useState<any[]>([]);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [selectedUpdate, setSelectedUpdate] = useState<any>(null);
   useEffect(() => {
     fetchCategories();
     if (id) {
@@ -135,7 +145,7 @@ export default function EditCampaignPage() {
         return;
       }
 
-      let query = supabase
+      const query = supabase
         .from('campaigns')
         .select('*')
         .eq('id', campaignId);
@@ -182,6 +192,10 @@ export default function EditCampaignPage() {
           setPresetAmounts(formattedAmounts.slice(0, 5));
         }
       }
+
+      // Fetch updates
+      fetchUpdates(campaignId);
+
     } catch (error) {
       console.error('Error:', error);
       toast.error('Kesalahan Sistem', {
@@ -190,6 +204,37 @@ export default function EditCampaignPage() {
       navigate('/donasi/campaigns');
     } finally {
       setFetching(false);
+    }
+  };
+
+  const fetchUpdates = async (campaignId: string) => {
+    const { data: updatesData, error } = await supabase
+      .from('campaign_updates')
+      .select('*')
+      .eq('campaign_id', campaignId)
+      .order('created_at', { ascending: false });
+
+    if (!error && updatesData) {
+      setUpdates(updatesData);
+    }
+  };
+
+  const handleDeleteUpdate = async (updateId: string) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus kabar ini?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('campaign_updates')
+        .delete()
+        .eq('id', updateId);
+
+      if (error) throw error;
+
+      toast.success('Kabar berhasil dihapus');
+      if (campaign?.id) fetchUpdates(campaign.id);
+    } catch (error: any) {
+      console.error('Error deleting update:', error);
+      toast.error('Gagal menghapus kabar: ' + error.message);
     }
   };
 
@@ -394,28 +439,39 @@ export default function EditCampaignPage() {
     <DashboardLayout>
       <div>
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/donasi/campaigns')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-all shadow-sm hover:shadow-md"
             >
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">Edit Campaign</h1>
-              <p className="text-sm text-gray-600 mt-1">Data Campaign / Edit</p>
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Edit Campaign</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-sm font-medium text-gray-500">Campaigns</span>
+                <span className="text-gray-300">/</span>
+                <span className="text-sm font-medium text-orange-600">Edit Details</span>
+              </div>
             </div>
           </div>
+
+          <button
+            onClick={() => window.open(`/campaign/${slug}`, '_blank')}
+            className="px-5 py-2.5 text-sm font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all flex items-center gap-2 border border-blue-100 hover:border-blue-200 shadow-sm"
+          >
+            Lihat Halaman
+          </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Campaign Details */}
           <div className="lg:col-span-2 space-y-6">
             {/* Campaign Section */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 hover:shadow-md transition-shadow duration-300">
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-gray-700 mb-2">
                   Title / Judul <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -423,33 +479,33 @@ export default function EditCampaignPage() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Masukkan judul campaign"
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
+                  className="w-full px-5 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all text-gray-800 placeholder:text-gray-400 font-medium"
                 />
-                <div className="mt-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Slug <span className="text-gray-500 text-xs">(URL-friendly)</span>
+                <div className="mt-3">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Slug (URL Friendly)
                   </label>
-                  <input
-                    type="text"
-                    value={slug}
-                    onChange={(e) => {
-                      setSlug(e.target.value);
-                      setSlugManuallyEdited(true);
-                    }}
-                    placeholder="slug-otomatis-dari-judul"
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Slug akan digunakan di URL campaign. Kosongkan untuk auto-generate dari judul.
-                  </p>
+                  <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5">
+                    <span className="text-gray-400 text-sm font-medium">donasi.co/campaign/</span>
+                    <input
+                      type="text"
+                      value={slug}
+                      onChange={(e) => {
+                        setSlug(e.target.value);
+                        setSlugManuallyEdited(true);
+                      }}
+                      placeholder="slug-otomatis"
+                      className="flex-1 bg-transparent border-none p-0 focus:ring-0 text-gray-600 text-sm font-medium"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Image (650 x 350)
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Campaign Image (650 x 350)
                 </label>
-                <div className="relative">
+                <div className="relative group">
                   <input
                     type="file"
                     accept="image/*"
@@ -459,14 +515,24 @@ export default function EditCampaignPage() {
                   />
                   <label
                     htmlFor="image-upload"
-                    className="block w-full h-48 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-orange-500 transition-colors flex items-center justify-center"
+                    className="block w-full h-64 border-2 border-dashed border-gray-300 rounded-2xl cursor-pointer hover:border-orange-500 hover:bg-orange-50/30 transition-all flex items-center justify-center overflow-hidden relative"
                   >
                     {imagePreview ? (
-                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover rounded-lg" />
+                      <>
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <span className="text-white font-semibold flex items-center gap-2 bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm">
+                            <Upload className="w-4 h-4" /> Ganti Gambar
+                          </span>
+                        </div>
+                      </>
                     ) : (
-                      <div className="text-center">
-                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-xs text-gray-500">650 x 350</p>
+                      <div className="text-center p-6">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform text-gray-400 group-hover:text-orange-500">
+                          <Upload className="w-8 h-8" />
+                        </div>
+                        <p className="text-sm font-semibold text-gray-600">Klik untuk upload gambar</p>
+                        <p className="text-xs text-gray-400 mt-1">Rekomendasi ukuran: 650 x 350 px</p>
                       </div>
                     )}
                   </label>
@@ -474,115 +540,189 @@ export default function EditCampaignPage() {
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-bold text-gray-700 mb-2">
                   Information / Keterangan <span className="text-red-500">*</span>
                 </label>
-                <RichTextEditor
-                  value={description}
-                  onChange={setDescription}
-                  placeholder="Masukkan keterangan campaign. Anda bisa memformat teks, menambahkan heading, dan mengupload gambar."
-                />
+                <div className="rounded-xl overflow-hidden border border-gray-200 focus-within:border-orange-500 focus-within:ring-4 focus-within:ring-orange-500/10 transition-all">
+                  <RichTextEditor
+                    value={description}
+                    onChange={setDescription}
+                    placeholder="Ceritakan detail campaign anda..."
+                  />
+                </div>
                 <div className="flex justify-end mt-2">
-                  <span className="text-xs text-gray-500">
-                    {description.replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length} WORDS
+                  <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-1 rounded-md">
+                    {description.replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length} Words
                   </span>
                 </div>
               </div>
             </div>
 
             {/* Donation Details Section */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Donation Details</h3>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 hover:shadow-md transition-shadow duration-300">
+              <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <span className="w-1 h-6 bg-orange-500 rounded-full"></span>
+                Donation Details
+              </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Target donasi <span className="text-red-500">*</span>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Target Donasi <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    value={targetAmount}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, '');
-                      const formatted = value.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                      setTargetAmount(formatted);
-                    }}
-                    placeholder="1.000.000"
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">Rp</span>
+                    <input
+                      type="text"
+                      value={targetAmount}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        const formatted = value.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                        setTargetAmount(formatted);
+                      }}
+                      placeholder="0"
+                      className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all font-semibold text-gray-800"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tanggal berakhir donasi <span className="text-red-500">*</span>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Batas Waktu
                   </label>
                   <div className="relative">
                     <input
                       type="date"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 pr-10"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all"
                     />
-                    <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                    <Calendar className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Location / Lokasi
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Lokasi
                   </label>
                   <input
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="Contoh: Bandung, Jawa Barat"
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Link Gmaps
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Link Google Maps
                   </label>
                   <input
                     type="text"
                     value={gmapsLink}
                     onChange={(e) => setGmapsLink(e.target.value)}
                     placeholder="https://maps.google.com/..."
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all text-blue-600"
                   />
                 </div>
               </div>
 
-              <p className="text-xs text-gray-500 mt-4">
-                <span className="text-red-500">*</span>: Wajib diisi
-              </p>
+              {/* Campaign Updates Section */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow duration-300 mt-6 md:mt-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <Megaphone className="w-4 h-4" />
+                    </span>
+                    Kabar Terbaru
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setSelectedUpdate(null);
+                      setShowUpdateModal(true);
+                    }}
+                    className="text-xs flex items-center gap-1.5 font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-all shadow-sm hover:shadow-blue-200"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Tulis Kabar
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {updates.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                      <Megaphone className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500 font-medium">Belum ada highlight berita</p>
+                    </div>
+                  ) : (
+                    updates.map((update) => (
+                      <div key={update.id} className="p-4 bg-white rounded-xl border border-gray-100 flex justify-between items-start group hover:border-blue-200 hover:shadow-sm transition-all duration-200">
+                        <div className="flex-1 min-w-0 pr-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
+                              {new Date(update.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
+                          </div>
+                          <h4 className="font-bold text-gray-900 text-sm truncate">{update.title}</h4>
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-1">
+                            {update.content.replace(/<[^>]*>/g, '')}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity bg-gray-50 p-1 rounded-lg">
+                          <button
+                            onClick={() => {
+                              setSelectedUpdate(update);
+                              setShowUpdateModal(true);
+                            }}
+                            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-white rounded-md transition-all shadow-sm"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUpdate(update.id)}
+                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-white rounded-md transition-all shadow-sm"
+                            title="Hapus"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Right Column - Form Type and Publish Options */}
           <div className="space-y-6">
             {/* Form Type Section */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Form Type</h3>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow duration-300">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <span className="w-1 h-6 bg-purple-500 rounded-full"></span>
+                Tipe Konfigurasi
+              </h3>
 
-              <div className="flex gap-2 mb-6">
+              <div className="flex bg-gray-50 p-1 rounded-xl mb-6">
                 <button
                   onClick={() => setFormType('donation')}
-                  className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${formType === 'donation'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-white text-gray-700 border-2 border-gray-200'
+                  className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${formType === 'donation'
+                    ? 'bg-white text-purple-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                     }`}
                 >
-                  Donation
+                  Donasi Umum
                 </button>
                 <button
                   onClick={() => setFormType('zakat')}
-                  className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${formType === 'zakat'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-white text-gray-700 border-2 border-gray-200'
+                  className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${formType === 'zakat'
+                    ? 'bg-white text-purple-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                     }`}
                 >
                   Zakat
@@ -590,21 +730,25 @@ export default function EditCampaignPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Preset Nominal</label>
-                <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Preset Nominal</label>
+                <div className="space-y-3">
                   {presetAmounts.map((amount, index) => (
-                    <input
-                      key={index}
-                      type="text"
-                      value={amount}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '');
-                        const formatted = value.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                        handlePresetAmountChange(index, formatted);
-                      }}
-                      placeholder={index === presetAmounts.length - 1 ? "OTHER NOMINAL" : "Rp"}
-                      className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 text-sm"
-                    />
+                    <div key={index} className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-semibold">
+                        {index === presetAmounts.length - 1 ? 'Lainnya' : 'Rp'}
+                      </span>
+                      <input
+                        type="text"
+                        value={amount}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          const formatted = value.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                          handlePresetAmountChange(index, formatted);
+                        }}
+                        placeholder={index === presetAmounts.length - 1 ? "Nominal Lainnya" : "0"}
+                        className="w-full pl-12 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 text-sm font-medium transition-all"
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -632,93 +776,116 @@ export default function EditCampaignPage() {
                 </div>
               </label>
             </div>
-          </div>
 
-          {/* Publish Section */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Publish</h3>
+            {/* Publish Section */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow duration-300 sticky top-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <span className="w-1 h-6 bg-green-500 rounded-full"></span>
+                Publishing
+              </h3>
 
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">Category</label>
-                <button
-                  type="button"
-                  onClick={() => setShowAddCategory(!showAddCategory)}
-                  className="text-xs text-orange-500 hover:text-orange-600 font-semibold"
-                >
-                  {showAddCategory ? 'Batal' : '+ Tambah Kategori'}
-                </button>
-              </div>
-
-              {showAddCategory ? (
-                <div className="space-y-2 mb-2">
-                  <input
-                    type="text"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="Nama kategori baru"
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAddCategory();
-                      }
-                    }}
-                  />
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-bold text-gray-700">Kategori</label>
                   <button
                     type="button"
-                    onClick={handleAddCategory}
-                    className="w-full px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors"
+                    onClick={() => setShowAddCategory(!showAddCategory)}
+                    className="text-xs text-orange-600 hover:text-orange-700 font-bold bg-orange-50 px-2 py-1 rounded-md"
                   >
-                    Tambahkan Kategori
+                    {showAddCategory ? 'Batal' : '+ Buat Baru'}
                   </button>
                 </div>
-              ) : null}
 
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500"
-              >
-                <option value="">Uncategorized</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+                {showAddCategory && (
+                  <div className="space-y-2 mb-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Nama kategori baru"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 text-sm"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddCategory();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCategory}
+                      className="w-full px-4 py-2 bg-gray-900 text-white rounded-xl font-semibold hover:bg-black transition-colors text-xs"
+                    >
+                      Tambahkan Kategori
+                    </button>
+                  </div>
+                )}
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as 'draft' | 'published')}
-                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 capitalize"
-              >
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-              </select>
-            </div>
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all font-medium text-gray-700 bg-white"
+                >
+                  <option value="">Uncategorized</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div className="space-y-3">
-              <button
-                onClick={() => handleSave(false)}
-                disabled={loading}
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                {status === 'published' ? 'Update Campaign' : 'Save to Draft'}
-              </button>
-              <button
-                onClick={() => handleSave(true)}
-                disabled={loading}
-                className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <Send className="w-4 h-4" />
-                {status === 'published' ? 'Update & Keep Published' : 'Publish'}
-              </button>
+              <div className="mb-8">
+                <label className="block text-sm font-bold text-gray-700 mb-3">Status Saat Ini</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setStatus('draft')}
+                    className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all border ${status === 'draft' ? 'bg-gray-100 border-gray-400 text-gray-800' : 'bg-white border-gray-100 text-gray-400'}`}
+                  >
+                    Draft
+                  </button>
+                  <button
+                    onClick={() => setStatus('published')}
+                    className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all border ${status === 'published' ? 'bg-green-50 border-green-500 text-green-700' : 'bg-white border-gray-100 text-gray-400'}`}
+                  >
+                    Published
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-4 border-t border-gray-100">
+                <button
+                  onClick={() => handleSave(false)}
+                  disabled={loading}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl font-bold text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  {status === 'published' ? 'Update Detail' : 'Simpan sebagai Draft'}
+                </button>
+                <button
+                  onClick={() => handleSave(true)}
+                  disabled={loading}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-bold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transition-all flex items-center justify-center gap-2 disabled:opacity-50 transform hover:-translate-y-0.5"
+                >
+                  <Send className="w-4 h-4" />
+                  {status === 'published' ? 'Update & Tetap Publish' : 'Publish Sekarang'}
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Campaign Updates Section */}
+
+
+          <CreateUpdateModal
+            isOpen={showUpdateModal}
+            onClose={() => {
+              setShowUpdateModal(false);
+              setSelectedUpdate(null);
+            }}
+            campaignId={id || ''}
+            initialData={selectedUpdate}
+            onSuccess={() => id && fetchUpdates(id)}
+          />
         </div>
       </div>
     </DashboardLayout>

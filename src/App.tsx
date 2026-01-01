@@ -66,6 +66,7 @@ import WithdrawalsPage from './pages/WithdrawalsPage';
 import PrayersPage from './pages/PrayersPage';
 import CampaignsListPage from './pages/CampaignsListPage';
 import CampaignDonorsPage from './pages/CampaignDonorsPage';
+import CampaignWithdrawalsPage from './pages/CampaignWithdrawalsPage';
 import CampaignPrayersPage from './pages/CampaignPrayersPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -174,6 +175,7 @@ function AppContent() {
       <Route path="/campaign" element={<CampaignsListPage />} />
       <Route path="/campaign/:slug" element={<CampaignPage />} />
       <Route path="/campaign/:slug/donatur" element={<CampaignDonorsPage />} />
+      <Route path="/campaign/:slug/withdrawals" element={<CampaignWithdrawalsPage />} />
       <Route path="/campaign/:slug/doa" element={<CampaignPrayersPage />} />
       <Route path="/campaign/:slug/donasi-amount" element={<DonationForm />} />
       <Route path="/campaign/:slug/invoice/:invoiceCode" element={<InvoicePage />} />

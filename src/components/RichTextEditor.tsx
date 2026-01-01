@@ -159,11 +159,11 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Masukka
     <div className="rich-text-editor">
       <div
         ref={containerRef}
-        style={{ minHeight: '400px' }}
+        style={{ minHeight: '250px' }}
       />
       <style>{`
         .rich-text-editor .ql-container {
-          min-height: 400px;
+          min-height: 250px;
           font-size: 16px;
           border-bottom-left-radius: 0.5rem;
           border-bottom-right-radius: 0.5rem;
@@ -181,7 +181,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Masukka
           border-color: #f97316;
         }
         .rich-text-editor .ql-editor {
-          min-height: 400px;
+          min-height: 250px;
         }
         .rich-text-editor .ql-editor.ql-blank::before {
           font-style: normal;

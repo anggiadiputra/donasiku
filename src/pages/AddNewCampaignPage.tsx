@@ -403,7 +403,7 @@ export default function AddNewCampaignPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tanggal berakhir donasi <span className="text-red-500">*</span>
+                    Tanggal berakhir donasi
                   </label>
                   <div className="relative">
                     <input

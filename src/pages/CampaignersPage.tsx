@@ -28,6 +28,8 @@ interface Campaigner {
     organization_id?: string;
     org_verification_status?: 'unverified' | 'pending' | 'verified' | 'rejected';
     role?: string;
+    platform_fee?: number;
+    zakat_fee?: number;
 }
 
 export default function CampaignersPage() {
@@ -50,7 +52,9 @@ export default function CampaignersPage() {
         organization_name: '',
         phone_number: '',
         verification_status: 'unverified' as any,
-        org_verification_status: 'unverified' as any
+        org_verification_status: 'unverified' as any,
+        platform_fee: 0,
+        zakat_fee: 0
     });
 
     // ...
@@ -75,13 +79,31 @@ export default function CampaignersPage() {
             }
         }
 
+        // Fetch latest platform_fee and zakat_fee
+        let currentFee = campaigner.platform_fee || 0;
+        let currentZakatFee = campaigner.zakat_fee || 0;
+        try {
+            if (campaigner.organization_id) {
+                const { data: orgData } = await supabase.from('organizations').select('platform_fee, zakat_fee').eq('id', campaigner.organization_id).single();
+                if (orgData) {
+                    currentFee = orgData.platform_fee || 0;
+                    currentZakatFee = orgData.zakat_fee || 0;
+                }
+            } else {
+                const { data: profileData } = await supabase.from('profiles').select('platform_fee').eq('id', campaigner.user_id).single();
+                if (profileData) currentFee = profileData.platform_fee || 0;
+            }
+        } catch (e) { console.error(e); }
+
         setEditingCampaigner(campaigner);
         setEditForm({
             full_name: campaigner.full_name || '', // Populate
             organization_name: campaigner.organization_name || '',
             phone_number: phoneNumber,
             verification_status: campaigner.role === 'admin' ? 'verified' : campaigner.verification_status,
-            org_verification_status: campaigner.role === 'admin' ? 'verified' : (campaigner.org_verification_status || 'unverified')
+            org_verification_status: campaigner.role === 'admin' ? 'verified' : (campaigner.org_verification_status || 'unverified'),
+            platform_fee: currentFee,
+            zakat_fee: currentZakatFee
         });
         setEditModalOpen(true);
     };
@@ -116,20 +138,20 @@ export default function CampaignersPage() {
                     .update({
                         name: editForm.organization_name,
                         verification_status: editForm.org_verification_status,
-                        whatsapp_no: editForm.phone_number
+                        whatsapp_no: editForm.phone_number,
+                        platform_fee: editForm.platform_fee,
+                        zakat_fee: editForm.zakat_fee
                     })
                     .eq('id', editingCampaigner.organization_id);
 
                 if (orgError) throw orgError;
             } else {
-                // Independent Campaigner - update organization_name in profile as well?
-                // Usually independent uses organization_name as their display name too?
-                // Or we rely on full_name?
-                // Existing logic updated organization_name in profile. Let's keep it.
+                // Independent Campaigner
                 const { error: indepError } = await supabase
                     .from('profiles')
                     .update({
-                        organization_name: editForm.organization_name
+                        organization_name: editForm.organization_name,
+                        platform_fee: editForm.platform_fee
                     })
                     .eq('id', editingCampaigner.user_id);
                 if (indepError) throw indepError;
@@ -168,7 +190,7 @@ export default function CampaignersPage() {
                 // Fetch ALL members of the organization
                 const { data: members, error: memberError } = await supabase
                     .from('organization_members')
-                    .select('user_id, role, created_at, profiles:user_id(id, email, full_name, phone, organization_name, verification_status, role, bio), organizations(id, verification_status)')
+                    .select('user_id, role, created_at, profiles:user_id(id, email, full_name, phone, organization_name, verification_status, role, bio, platform_fee), organizations(id, verification_status, platform_fee, zakat_fee)')
                     .eq('organization_id', selectedOrganization.id);
 
                 if (memberError) throw memberError;
@@ -225,7 +247,9 @@ export default function CampaignersPage() {
                             : (m.created_at || new Date().toISOString()),
                         organization_id: m.organizations?.id,
                         org_verification_status: m.organizations?.verification_status || 'unverified',
-                        role: profile?.role
+                        role: profile?.role,
+                        platform_fee: m.organizations?.platform_fee || profile?.platform_fee || 0,
+                        zakat_fee: m.organizations?.zakat_fee || 0
                     });
                 });
 
@@ -256,7 +280,9 @@ export default function CampaignersPage() {
                     last_campaign: d.last_campaign_date || d.joined_at || new Date().toISOString(),
                     organization_id: d.organization_id,
                     org_verification_status: d.org_verification_status,
-                    role: d.role
+                    role: d.role,
+                    platform_fee: d.platform_fee || 0,
+                    zakat_fee: d.zakat_fee || 0
                 }));
 
                 setCampaigners(mappedCampaigners);
@@ -693,6 +719,67 @@ export default function CampaignersPage() {
                                 />
                                 <p className="text-xs text-gray-500 mt-1">Format: 628xxxxxxxxx (tanpa tanda +)</p>
                             </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    {editingCampaigner?.role === 'admin' ? 'Potongan Donasi Umum & Infaq (%)' : 'Potongan Biaya Operasional (%)'}
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="20"
+                                        step="0.1"
+                                        value={editForm.platform_fee}
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.target.value);
+                                            // Hard limit at 20%
+                                            if (val > 20) return;
+                                            setEditForm({ ...editForm, platform_fee: isNaN(val) ? 0 : val })
+                                        }}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                                    />
+                                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold">
+                                        %
+                                    </div>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {editingCampaigner?.role === 'admin'
+                                        ? 'Berlaku untuk Infaq dan donasi umum (Maks 20%).'
+                                        : 'Batas maksimal wajar: 20%.'
+                                    }
+                                </p>
+                            </div>
+
+                            {editingCampaigner?.role === 'admin' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Potongan Zakat (%)
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="12.5"
+                                            step="0.1"
+                                            value={editForm.zakat_fee}
+                                            onChange={(e) => {
+                                                const val = parseFloat(e.target.value);
+                                                // Hard limit at 12.5% for Zakat
+                                                if (val > 12.5) return;
+                                                setEditForm({ ...editForm, zakat_fee: isNaN(val) ? 0 : val })
+                                            }}
+                                            className="w-full px-4 py-2 border border-blue-300 bg-blue-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                                        />
+                                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold">
+                                            %
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Khusus untuk Zakat (Maks 12.5% sesuai BAZNAS).
+                                    </p>
+                                </div>
+                            )}
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">

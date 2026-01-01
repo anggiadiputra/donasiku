@@ -66,7 +66,7 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                 }
 
                 // 2. Fetch Campaigns based on settings
-                let query = supabase
+                const query = supabase
                     .from('campaigns')
                     .select('*, profiles:user_id(full_name, organization_name, avatar_url, role, verification_status), organizations(name, logo_url, verification_status)')
                     .eq('status', 'published')
@@ -78,6 +78,8 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
 
                     if (validIds.length === 0) {
                         const { data, error } = await query
+                            .order('is_featured', { ascending: false })
+                            .order('is_urgent', { ascending: false })
                             .order('created_at', { ascending: false })
                             .limit(10);
                         if (error) throw error;
@@ -94,6 +96,8 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                     }
                 } else {
                     const { data, error } = await query
+                        .order('is_featured', { ascending: false })
+                        .order('is_urgent', { ascending: false })
                         .order('created_at', { ascending: false })
                         .limit(10);
                     if (error) throw error;
@@ -105,6 +109,8 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                     .from('campaigns')
                     .select('*, profiles:user_id(full_name, organization_name, avatar_url, role, verification_status), organizations(name, logo_url, verification_status)')
                     .eq('status', 'published')
+                    .order('is_featured', { ascending: false })
+                    .order('is_urgent', { ascending: false })
                     .order('created_at', { ascending: false })
                     .limit(10);
                 if (error) throw error;
@@ -127,6 +133,8 @@ export default function CampaignSlider({ variant = 'primary' }: CampaignSliderPr
                     .select('*, profiles:user_id(full_name, organization_name, avatar_url, role, verification_status), organizations(name, logo_url, verification_status)')
                     .eq('status', 'published')
                     .not('slug', 'in', '("infaq","fidyah","zakat","wakaf","sedekah-subuh","kemanusiaan")')
+                    .order('is_featured', { ascending: false })
+                    .order('is_urgent', { ascending: false })
                     .order('created_at', { ascending: false })
                     .limit(10);
 

@@ -7,7 +7,7 @@ import {
     Search, DollarSign,
     Eye,
     Download, Loader2,
-    Check, X, AlertCircle,
+    Check, X,
     Plus, Banknote
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -25,7 +25,6 @@ export default function WithdrawalsPage() {
     // Modal state
     const [selectedWithdrawal, setSelectedWithdrawal] = useState<Withdrawal | null>(null);
     const [detailsModalOpen, setDetailsModalOpen] = useState(false);
-    const [actionModalOpen, setActionModalOpen] = useState(false);
     const [requestModalOpen, setRequestModalOpen] = useState(false);
     const [actionType, setActionType] = useState<'approve' | 'reject' | 'complete'>('approve');
     const [adminNote, setAdminNote] = useState('');
@@ -71,7 +70,7 @@ export default function WithdrawalsPage() {
             setLoading(true);
             const { data, error } = await supabase
                 .from('withdrawals')
-                .select('*, campaigns(title), profiles(full_name, organization_name, email)')
+                .select('*, campaigns(title, category), profiles(full_name, organization_name, email)')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -108,7 +107,7 @@ export default function WithdrawalsPage() {
             if (error) throw error;
 
             toast.success(`Berhasil ${actionType === 'approve' ? 'menyetujui' : actionType === 'reject' ? 'menolak' : 'menyelesaikan'} pencairan`);
-            setActionModalOpen(false);
+            setDetailsModalOpen(false);
             fetchWithdrawals();
         } catch (error: any) {
             console.error('Error updating withdrawal:', error);
@@ -204,6 +203,14 @@ export default function WithdrawalsPage() {
         return matchesStatus && matchesSearch;
     });
 
+    const getFeeLabel = (category?: string) => {
+        const cat = category?.toLowerCase() || '';
+        if (cat.includes('zakat') || cat.includes('fidyah')) {
+            return 'Biaya Hak Amil (Zakat)';
+        }
+        return 'Biaya Platform';
+    };
+
     return (
         <DashboardLayout>
             <div className="space-y-6">
@@ -246,8 +253,8 @@ export default function WithdrawalsPage() {
                             className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                         >
                             <option value="all">Semua Status</option>
-                            <option value="pending">Menunggu</option>
-                            <option value="approved">Disetujui</option>
+                            <option value="pending">Diajukan</option>
+                            <option value="approved">Sedang Diproses</option>
                             <option value="completed">Selesai</option>
                             <option value="rejected">Ditolak</option>
                         </select>
@@ -304,8 +311,8 @@ export default function WithdrawalsPage() {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-center">
                                                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase ${getStatusStyles(w.status)}`}>
-                                                    {w.status === 'pending' ? 'Menunggu' :
-                                                        w.status === 'approved' ? 'Disetujui' :
+                                                    {w.status === 'pending' ? 'Diajukan' :
+                                                        w.status === 'approved' ? 'Sedang Diproses' :
                                                             w.status === 'completed' ? 'Selesai' : 'Ditolak'}
                                                 </span>
                                             </td>
@@ -328,10 +335,10 @@ export default function WithdrawalsPage() {
                                                                     setSelectedWithdrawal(w);
                                                                     setActionType('approve');
                                                                     setAdminNote('');
-                                                                    setActionModalOpen(true);
+                                                                    setDetailsModalOpen(true);
                                                                 }}
                                                                 className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
-                                                                title="Setujui"
+                                                                title="Proses"
                                                             >
                                                                 <Check className="w-4 h-4" />
                                                             </button>
@@ -340,7 +347,7 @@ export default function WithdrawalsPage() {
                                                                     setSelectedWithdrawal(w);
                                                                     setActionType('reject');
                                                                     setAdminNote('');
-                                                                    setActionModalOpen(true);
+                                                                    setDetailsModalOpen(true);
                                                                 }}
                                                                 className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
                                                                 title="Tolak"
@@ -356,10 +363,10 @@ export default function WithdrawalsPage() {
                                                                 setActionType('complete');
                                                                 setAdminNote('');
                                                                 setReceiptUrl('');
-                                                                setActionModalOpen(true);
+                                                                setDetailsModalOpen(true);
                                                             }}
                                                             className="p-1.5 text-orange-600 hover:bg-orange-50 rounded transition-colors"
-                                                            title="Selesaikan (Kirim Bukti)"
+                                                            title="Selesaikan"
                                                         >
                                                             <DollarSign className="w-4 h-4" />
                                                         </button>
@@ -375,150 +382,289 @@ export default function WithdrawalsPage() {
                 </div>
             </div>
 
-            {/* Details Modal */}
+            {/* Unified Details & Action Modal */}
             {detailsModalOpen && selectedWithdrawal && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                            <h3 className="text-lg font-bold text-gray-900">Detail Pencairan</h3>
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-gray-100 flex items-center justify-between shrink-0">
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900">Detail Pencairan</h3>
+                                <p className="text-xs text-gray-500">ID: {selectedWithdrawal.id.slice(0, 8)}...</p>
+                            </div>
                             <button onClick={() => setDetailsModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
-                        <div className="p-6 space-y-4">
+
+                        {/* Modal Content - Scrollable */}
+                        <div className="p-6 space-y-6 overflow-y-auto">
+                            {/* Status Badge */}
+
+                            {/* Campaigner & Campaign Info */}
                             <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div>
                                     <p className="text-gray-500 mb-1">Campaigner</p>
-                                    <p className="font-semibold text-gray-900">
-                                        {(selectedWithdrawal.profiles as any)?.organization_name || (selectedWithdrawal.profiles as any)?.full_name}
-                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">
+                                            {((selectedWithdrawal.profiles as any)?.organization_name || (selectedWithdrawal.profiles as any)?.full_name || 'U').charAt(0)}
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-gray-900 leading-tight">
+                                                {(selectedWithdrawal.profiles as any)?.organization_name || (selectedWithdrawal.profiles as any)?.full_name}
+                                            </p>
+                                            <p className="text-xs text-gray-500">{(selectedWithdrawal.profiles as any)?.email}</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-gray-500 mb-1">Jumlah</p>
-                                    <p className="font-bold text-gray-900">{formatCurrency(selectedWithdrawal.amount)}</p>
+                                <div className="flex flex-col items-end">
+                                    <p className="text-gray-500 mb-1">Status</p>
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase ${getStatusStyles(selectedWithdrawal.status)}`}>
+                                        {selectedWithdrawal.status === 'pending' ? 'Diajukan' :
+                                            selectedWithdrawal.status === 'approved' ? 'Sedang Diproses' :
+                                                selectedWithdrawal.status === 'completed' ? 'Selesai' : 'Ditolak'}
+                                    </span>
                                 </div>
-                                <div className="col-span-2">
-                                    <p className="text-gray-500 mb-1">Campaign</p>
-                                    <p className="font-medium text-gray-900">{(selectedWithdrawal.campaigns as any)?.title}</p>
+                            </div>
+                            <div className="col-span-2 pt-2 border-t border-dashed border-gray-200">
+                                <p className="text-gray-500 mb-1 text-xs uppercase tracking-wider">Campaign Sumber Dana</p>
+                                <p className="font-medium text-gray-900">{(selectedWithdrawal.campaigns as any)?.title}</p>
+                            </div>
+
+                            {/* Rincian Dana Breakdown */}
+                            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                                <div className="bg-gray-50 px-4 py-3 border-b border-gray-100">
+                                    <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                                        <DollarSign className="w-4 h-4 text-blue-600" />
+                                        Rincian Pencairan Dana
+                                    </h4>
+                                </div>
+                                <div className="p-4 space-y-3">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">Jumlah Diajukan (Gross)</span>
+                                        <span className="font-bold text-gray-900">{formatCurrency(selectedWithdrawal.amount)}</span>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-sm text-red-600">
+                                            <span className="flex items-center gap-1">
+                                                {getFeeLabel((selectedWithdrawal.campaigns as any)?.category)}
+                                            </span>
+                                            <span>- {formatCurrency(selectedWithdrawal.fee_amount || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm text-red-600">
+                                            <span className="flex items-center gap-1">
+                                                Biaya Admin Bank
+                                            </span>
+                                            <span>- {formatCurrency(selectedWithdrawal.bank_fee || 0)}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-3 border-t border-dashed border-gray-200 flex justify-between items-center">
+                                        <span className="font-bold text-gray-900">Total Diterima (Net)</span>
+                                        <span className="font-bold text-lg text-blue-600">
+                                            {formatCurrency((selectedWithdrawal.amount || 0) - (selectedWithdrawal.fee_amount || 0) - (selectedWithdrawal.bank_fee || 0))}
+                                        </span>
+                                    </div>
+
+                                    {(selectedWithdrawal.fee_amount || 0) > 0 && (
+                                        <div className="mt-2 p-2 bg-yellow-50 rounded border border-yellow-100 text-[10px] text-yellow-700">
+                                            * {getFeeLabel((selectedWithdrawal.campaigns as any)?.category)} mencakup biaya operasional dan potongan wajib sesuai kategori campaign.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
-                            <div className="p-4 bg-gray-50 rounded-xl space-y-3">
-                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Info Rekening</h4>
+                            {/* Bank Info */}
+                            <div className="bg-blue-50/50 p-4 rounded-xl space-y-3 border border-blue-100">
+                                <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-2">
+                                    <Banknote className="w-3.5 h-3.5" /> Info Rekening Tujuan
+                                </h4>
                                 <div className="grid grid-cols-1 gap-2 text-sm">
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Bank</span>
+                                        <span className="text-gray-600">Bank</span>
                                         <span className="font-semibold">{selectedWithdrawal.bank_info.bank_name}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">No. Rekening</span>
+                                        <span className="text-gray-600">No. Rekening</span>
                                         <span className="font-mono font-bold text-blue-600">{selectedWithdrawal.bank_info.account_number}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Nama Pemilik</span>
+                                        <span className="text-gray-600">Atas Nama</span>
                                         <span className="font-semibold">{selectedWithdrawal.bank_info.account_holder}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            {selectedWithdrawal.admin_note && (
-                                <div>
-                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Catatan Admin</p>
-                                    <div className="p-3 bg-yellow-50 text-yellow-800 text-sm rounded-lg border border-yellow-100">
-                                        {selectedWithdrawal.admin_note}
+                            {/* Admin Actions Section */}
+                            {userRole === 'admin' && (selectedWithdrawal.status === 'pending' || selectedWithdrawal.status === 'approved') && (
+                                <div className="space-y-4 pt-4 border-t border-gray-100">
+                                    <h4 className="font-bold text-gray-900 flex items-center gap-2">
+                                        <Check className="w-4 h-4 text-green-500" /> Tindakan Admin
+                                    </h4>
+
+                                    {/* Action Buttons based on status */}
+                                    <div className="flex gap-2">
+                                        {selectedWithdrawal.status === 'pending' && (
+                                            <>
+                                                <button
+                                                    onClick={() => {
+                                                        setActionType('approve');
+                                                        setAdminNote('');
+                                                    }}
+                                                    className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-all ${actionType === 'approve'
+                                                        ? 'bg-green-50 border-green-500 text-green-700 ring-1 ring-green-500'
+                                                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    Setujui & Proses
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setActionType('reject');
+                                                        setAdminNote('');
+                                                    }}
+                                                    className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-all ${actionType === 'reject'
+                                                        ? 'bg-red-50 border-red-500 text-red-700 ring-1 ring-red-500'
+                                                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    Tolak
+                                                </button>
+                                            </>
+                                        )}
+                                        {selectedWithdrawal.status === 'approved' && (
+                                            <button
+                                                onClick={() => {
+                                                    setActionType('complete');
+                                                    setAdminNote('');
+                                                }}
+                                                className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-all ${actionType === 'complete'
+                                                    ? 'bg-blue-50 border-blue-500 text-blue-700 ring-1 ring-blue-500'
+                                                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                                    }`}
+                                            >
+                                                Konfirmasi Transfer (Selesai)
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Conditional Inputs based on ActionType */}
+                                    <div className="space-y-3 bg-gray-50 p-4 rounded-xl animate-in fade-in slide-in-from-top-2">
+                                        {actionType === 'reject' && (
+                                            <div>
+                                                <label className="block text-xs font-bold text-red-600 uppercase mb-1">Alasan Penolakan</label>
+                                                <textarea
+                                                    value={adminNote}
+                                                    onChange={(e) => setAdminNote(e.target.value)}
+                                                    className="w-full px-3 py-2 text-sm border border-red-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                                    placeholder="Jelaskan mengapa permintaan ini ditolak..."
+                                                    rows={3}
+                                                    autoFocus
+                                                />
+                                            </div>
+                                        )}
+
+                                        {actionType === 'approve' && (
+                                            <div>
+                                                <label className="block text-xs font-bold text-green-600 uppercase mb-1">Catatan Persetujuan (Opsional)</label>
+                                                <textarea
+                                                    value={adminNote}
+                                                    onChange={(e) => setAdminNote(e.target.value)}
+                                                    className="w-full px-3 py-2 text-sm border border-green-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                                                    placeholder="Catatan untuk campaigner (misal: akan cair dalam 24 jam)..."
+                                                    rows={2}
+                                                />
+                                            </div>
+                                        )}
+
+                                        {actionType === 'complete' && (
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-blue-600 uppercase mb-1">Link Bukti Transfer (Wajib)</label>
+                                                    <input
+                                                        type="url"
+                                                        value={receiptUrl}
+                                                        onChange={(e) => setReceiptUrl(e.target.value)}
+                                                        className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        placeholder="https://..."
+                                                        autoFocus
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Catatan Tambahan</label>
+                                                    <textarea
+                                                        value={adminNote}
+                                                        onChange={(e) => setAdminNote(e.target.value)}
+                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        placeholder="Informasi tambahan..."
+                                                        rows={2}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
 
-                            {selectedWithdrawal.receipt_url && (
-                                <div className="flex justify-center pt-2">
-                                    <a
-                                        href={selectedWithdrawal.receipt_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline"
-                                    >
-                                        <Download className="w-4 h-4" />
-                                        Lihat Bukti Transfer
-                                    </a>
-                                </div>
+                            {/* Read-Only Notes for Non-Admin or Completed/Rejected States */}
+                            {(userRole !== 'admin' || selectedWithdrawal.status === 'rejected' || selectedWithdrawal.status === 'completed') && (
+                                <>
+                                    {selectedWithdrawal.admin_note && (
+                                        <div>
+                                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Catatan Admin</p>
+                                            <div className={`p-3 text-sm rounded-lg border ${selectedWithdrawal.status === 'rejected' ? 'bg-red-50 text-red-800 border-red-100' : 'bg-yellow-50 text-yellow-800 border-yellow-100'}`}>
+                                                {selectedWithdrawal.admin_note}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {selectedWithdrawal.receipt_url && (
+                                        <div className="flex justify-center pt-2">
+                                            <a
+                                                href={selectedWithdrawal.receipt_url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline bg-blue-50 px-4 py-2 rounded-full"
+                                            >
+                                                <Download className="w-4 h-4" />
+                                                Lihat Bukti Transfer
+                                            </a>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
-                    </div>
-                </div>
-            )}
 
-            {/* Action Modal */}
-            {actionModalOpen && selectedWithdrawal && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                            <h3 className="text-lg font-bold text-gray-900">
-                                {actionType === 'approve' ? 'Setujui Pencairan' :
-                                    actionType === 'reject' ? 'Tolak Pencairan' : 'Selesaikan Pencairan'}
-                            </h3>
-                            <button onClick={() => setActionModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <div className="p-4 bg-blue-50 text-blue-800 rounded-xl flex items-start gap-3 text-sm">
-                                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                                <div>
-                                    <p className="font-semibold">Konfirmasi Aksi</p>
-                                    <p className="text-blue-600">
-                                        Anda akan {actionType === 'approve' ? 'menyetujui' : actionType === 'reject' ? 'menolak' : 'menyelesaikan'} pencairan untuk
-                                        <strong> {(selectedWithdrawal.profiles as any)?.organization_name || (selectedWithdrawal.profiles as any)?.full_name}</strong> sebesar
-                                        <strong> {formatCurrency(selectedWithdrawal.amount)}</strong>.
-                                    </p>
-                                </div>
+                        {/* Modal Footer - Actions */}
+                        {userRole === 'admin' && (selectedWithdrawal.status === 'pending' || selectedWithdrawal.status === 'approved') ? (
+                            <div className="p-4 border-t border-gray-100 bg-gray-50 flex gap-3 shrink-0">
+                                <button
+                                    onClick={() => setDetailsModalOpen(false)}
+                                    className="flex-1 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    onClick={handleAction}
+                                    disabled={processing || (actionType === 'complete' && !receiptUrl) || (actionType === 'reject' && !adminNote)}
+                                    className={`flex-1 px-4 py-2.5 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 ${actionType === 'approve' ? 'bg-green-600 hover:bg-green-700' :
+                                        actionType === 'reject' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+                                        }`}
+                                >
+                                    {processing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+                                    Simpan Perubahan
+                                </button>
                             </div>
-
-                            {actionType === 'complete' && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Link Bukti Transfer</label>
-                                    <input
-                                        type="url"
-                                        value={receiptUrl}
-                                        onChange={(e) => setReceiptUrl(e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                        placeholder="https://link-gambar-atau-pdf-bukti-transfer"
-                                    />
-                                    <p className="mt-1 text-xs text-gray-500">Wajib diisi untuk status 'Selesai'</p>
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Catatan (Optional)</label>
-                                <textarea
-                                    value={adminNote}
-                                    onChange={(e) => setAdminNote(e.target.value)}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="Berikan alasan atau keterangan tambahan..."
-                                    rows={3}
-                                />
+                        ) : (
+                            <div className="p-4 border-t border-gray-100 bg-gray-50">
+                                <button
+                                    onClick={() => setDetailsModalOpen(false)}
+                                    className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
+                                >
+                                    Tutup
+                                </button>
                             </div>
-                        </div>
-                        <div className="p-6 bg-gray-50 flex gap-3">
-                            <button
-                                onClick={() => setActionModalOpen(false)}
-                                className="flex-1 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
-                            >
-                                Batal
-                            </button>
-                            <button
-                                onClick={handleAction}
-                                disabled={processing || (actionType === 'complete' && !receiptUrl)}
-                                className={`flex-1 px-4 py-2.5 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 ${actionType === 'approve' ? 'bg-green-600 hover:bg-green-700' :
-                                        actionType === 'reject' ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'
-                                    }`}
-                            >
-                                {processing ? <Loader2 className="w-5 h-5 animate-spin" /> :
-                                    actionType === 'approve' ? <Check className="w-5 h-5" /> :
-                                        actionType === 'reject' ? <X className="w-5 h-5" /> : <DollarSign className="w-5 h-5" />}
-                                Konfirmasi
-                            </button>
-                        </div>
+                        )}
                     </div>
                 </div>
             )}

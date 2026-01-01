@@ -74,7 +74,7 @@ export default function OrganizationProfilePage() {
             // 3. Calculate Aggregates
             const campaignIds = (campaignList || []).map(c => c.id);
             let donorsCount = 0;
-            let totalRaisedAmount = (campaignList || []).reduce((acc, curr) => acc + (curr.current_amount || 0), 0);
+            const totalRaisedAmount = (campaignList || []).reduce((acc, curr) => acc + (curr.current_amount || 0), 0);
 
             if (campaignIds.length > 0) {
                 const { count, error: countError } = await supabase

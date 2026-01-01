@@ -116,9 +116,16 @@ export default function DonasiDashboardPage() {
             // Admin: All (unless Org selected)
             // Org: Filter by org
             // Personal: Filter by user_id
+
+            // Determine if we need strict filtering (Inner Join)
+            // We use Inner Join if:
+            // 1. Not Admin (Campaigner/User) - Must only see own data
+            // 2. Organization is Selected - Must only see Org data (even if Admin)
+            const useStrictFilter = !isAdmin || selectedOrganization;
+
             let txQuery = supabase
                 .from('transactions')
-                .select(isAdmin ? '*, campaigns(title, organization_id, user_id)' : '*, campaigns!inner(title, user_id, organization_id)')
+                .select(useStrictFilter ? '*, campaigns!inner(title, user_id, organization_id)' : '*, campaigns(title, organization_id, user_id)')
                 .order('created_at', { ascending: false });
 
             if (selectedOrganization) {
@@ -389,13 +396,13 @@ export default function DonasiDashboardPage() {
                             */
                             (
                                 <div className={`mb-6 p-4 rounded-xl border flex flex-col md:flex-row items-center justify-between gap-4 ${(selectedOrganization ? selectedOrganization.verification_status : userProfile?.verification_status) === 'pending'
-                                        ? 'bg-amber-50 border-amber-200'
-                                        : 'bg-red-50 border-red-200'
+                                    ? 'bg-amber-50 border-amber-200'
+                                    : 'bg-red-50 border-red-200'
                                     }`}>
                                     <div className="flex items-center gap-4">
                                         <div className={`w-12 h-12 rounded-full flex items-center justify-center ${(selectedOrganization ? selectedOrganization.verification_status : userProfile?.verification_status) === 'pending'
-                                                ? 'bg-amber-100 text-amber-600'
-                                                : 'bg-red-100 text-red-600'
+                                            ? 'bg-amber-100 text-amber-600'
+                                            : 'bg-red-100 text-red-600'
                                             }`}>
                                             <AlertCircle className="w-6 h-6" />
                                         </div>

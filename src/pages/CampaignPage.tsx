@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Share2 } from 'lucide-react';
+import { ArrowLeft, Share2, Megaphone, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase, Campaign, Testimonial } from '../lib/supabase';
 import ShareModal from '../components/ShareModal';
 import VerifiedBadge from '../components/VerifiedBadge';
@@ -27,6 +27,11 @@ export default function CampaignPage() {
   const [donors, setDonors] = useState<any[]>([]);
   const [realtimeStats, setRealtimeStats] = useState({ amount: 0, count: 0 });
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // Updates State
+  const [updates, setUpdates] = useState<any[]>([]);
+  const [expandedUpdateId, setExpandedUpdateId] = useState<string | null>(null);
+
 
   // Calculate hover color (darker)
   const getHoverColor = (color: string) => {
@@ -104,11 +109,12 @@ export default function CampaignPage() {
         // Check access: Published OR Owner
         let shouldShow = data.status === 'published';
 
-        if (!shouldShow) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user && data.user_id === user.id) {
-            shouldShow = true;
-          }
+        // Check ownership
+        const { data: { user } } = await supabase.auth.getUser();
+        const isUserOwner = user && data.user_id === user.id;
+
+        if (isUserOwner) {
+          shouldShow = true; // Owners can always see
         }
 
         if (shouldShow) {
@@ -129,6 +135,8 @@ export default function CampaignPage() {
             count: data.donor_count || 0
           });
           fetchCampaignTransactions(data.id);
+          // Initial fetch of updates
+          fetchUpdates(data.id);
         }
       }
     } catch (err: any) {
@@ -212,6 +220,18 @@ export default function CampaignPage() {
 
     } catch (error) {
       console.error('Error in fetchCampaignTransactions:', error);
+    }
+  };
+
+  const fetchUpdates = async (campaignId: string) => {
+    const { data: updatesData, error: updatesError } = await supabase
+      .from('campaign_updates')
+      .select('*')
+      .eq('campaign_id', campaignId)
+      .order('created_at', { ascending: false });
+
+    if (!updatesError && updatesData) {
+      setUpdates(updatesData);
     }
   };
 
@@ -361,11 +381,14 @@ export default function CampaignPage() {
             <div className="mb-6">
               <div className="flex justify-between items-end mb-1">
                 <p className="text-xs text-gray-500">Dana terkumpul</p>
-                {(campaign.end_date) && (
-                  <p className="text-xs text-gray-500">
-                    Sisa hari: <span className="font-semibold text-gray-700">{Math.max(0, Math.ceil((new Date(campaign.end_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)))} hari</span>
-                  </p>
-                )}
+                <p className="text-xs text-gray-500">
+                  Sisa hari: <span className="font-semibold text-gray-700">
+                    {campaign.end_date
+                      ? `${Math.max(0, Math.ceil((new Date(campaign.end_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)))} hari`
+                      : '∞'
+                    }
+                  </span>
+                </p>
               </div>
               <p className="text-2xl font-bold mb-2" style={{ color: primaryColor }}>
                 {formatCurrency(realtimeStats.amount)}
@@ -505,11 +528,99 @@ export default function CampaignPage() {
 
           {/* 6. Section: Kabar Terbaru */}
           <div className="px-5 py-5 border-b border-gray-100">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="font-bold text-gray-800">Kabar Terbaru</h3>
-              <span className="text-blue-500 text-sm cursor-pointer">Lihat Semua</span>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                <Megaphone className="w-5 h-5 text-blue-600" />
+                Kabar Terbaru
+              </h3>
+              <div className="flex items-center gap-2">
+                {updates.length > 0 && (
+                  <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2 py-1 rounded-full">{updates.length} Update</span>
+                )}
+              </div>
             </div>
-            <p className="text-gray-500 text-sm">Belum ada kabar terbaru dari penggalang dana.</p>
+
+            <div className="relative pl-2">
+              {/* Vertical Line */}
+              <div className="absolute left-[7px] top-2 bottom-4 w-[2px] bg-gray-100"></div>
+
+              {updates.length === 0 ? (
+                <div className="text-center py-6 bg-gray-50 rounded-xl border border-gray-100 border-dashed ml-6">
+                  <p className="text-gray-500 text-sm mb-2">Belum ada kabar terbaru dari penggalang dana.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {updates.slice(0, 3).map((update) => (
+                    <div key={update.id} className="relative pl-8">
+                      {/* Dot Indicator */}
+                      <div
+                        className="absolute left-0 top-1.5 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10"
+                        style={{ backgroundColor: primaryColor }}
+                      ></div>
+
+                      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-bold text-gray-900 text-sm">{update.title}</h4>
+                          <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded-full whitespace-nowrap">
+                            {getTimeAgo(update.created_at)}
+                          </span>
+                        </div>
+
+                        {update.image_url && (
+                          <div className="mb-3 rounded-lg overflow-hidden h-32 w-full">
+                            <img src={update.image_url} alt="Update" className="w-full h-full object-cover" />
+                          </div>
+                        )}
+
+                        <div
+                          className={`text-sm text-gray-600 leading-relaxed prose prose-sm max-w-none ${expandedUpdateId === update.id ? '' : 'line-clamp-3'}`}
+                          dangerouslySetInnerHTML={{ __html: update.content }}
+                        />
+
+                        {update.content.length > 150 && (
+                          <button
+                            onClick={() => setExpandedUpdateId(expandedUpdateId === update.id ? null : update.id)}
+                            className="text-xs font-semibold mt-2 flex items-center gap-1 hover:underline"
+                            style={{ color: primaryColor }}
+                          >
+                            {expandedUpdateId === update.id ? (
+                              <>Sembunyikan <ChevronUp className="w-3 h-3" /></>
+                            ) : (
+                              <>Lihat Selengkapnya <ChevronDown className="w-3 h-3" /></>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {updates.length > 3 && (
+                    <button className="w-full py-2 text-sm font-medium text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors ml-4">
+                      Lihat Semua Kabar ({updates.length})
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+
+
+          {/* Section: Pencairan Dana */}
+          <div className="px-5 py-5 border-b border-gray-100 bg-gray-50/50">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-gray-800">Pencairan Dana</h3>
+                <p className="text-xs text-gray-500 mt-1">Transparansi penggunaan dana</p>
+              </div>
+              <button
+                onClick={() => navigate(`/campaign/${slug}/withdrawals`)}
+                className="text-blue-600 font-semibold text-sm bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors"
+                style={{ color: primaryColor, borderColor: `${primaryColor}20`, backgroundColor: `${primaryColor}10` }}
+              >
+                Lihat Rincian
+              </button>
+            </div>
           </div>
 
           {/* 7. Section: Donasi (New) */}
@@ -656,6 +767,6 @@ export default function CampaignPage() {
         shareUrl={`${window.location.origin}${window.location.pathname}?utm_source=socialsharing_donor_web_campaign_detail&utm_medium=share_campaign_copas&utm_campaign=share_detail_campaign`}
         shareText={campaign ? `Bantu ${campaign.title} di Donasiku!` : 'Bantu campaign ini di Donasiku!'}
       />
-    </div >
+    </div>
   );
 }

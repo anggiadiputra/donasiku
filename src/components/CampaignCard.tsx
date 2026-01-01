@@ -34,7 +34,7 @@ export default function CampaignCard({ campaign, onClick }: CampaignCardProps) {
     }).format(amount);
   };
 
-  // Calculate days remaining (default to 30 days if no end date)
+  // Calculate days remaining (return null if no end date)
   const calculateDaysRemaining = () => {
     if (campaign.end_date) {
       const endDate = new Date(campaign.end_date);
@@ -43,15 +43,7 @@ export default function CampaignCard({ campaign, onClick }: CampaignCardProps) {
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       return Math.max(0, diffDays);
     }
-
-    // If no end_date, calculate from created_at + 30 days
-    const createdDate = new Date(campaign.created_at);
-    const endDate = new Date(createdDate);
-    endDate.setDate(endDate.getDate() + 30); // Default 30 days
-    const today = new Date();
-    const diffTime = endDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
+    return null;
   };
 
   const daysRemaining = calculateDaysRemaining();
@@ -120,7 +112,7 @@ export default function CampaignCard({ campaign, onClick }: CampaignCardProps) {
           </div>
           <div className="text-right flex-shrink-0">
             <span className="text-xs text-gray-600 block">Sisa hari</span>
-            <span className="text-sm font-semibold text-gray-700">{daysRemaining}</span>
+            <span className="text-sm font-semibold text-gray-700">{daysRemaining === null ? '∞' : daysRemaining}</span>
           </div>
         </div>
 

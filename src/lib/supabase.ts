@@ -97,6 +97,10 @@ export interface Withdrawal {
   };
   admin_note?: string;
   receipt_url?: string;
+  fee_amount?: number;
+  bank_fee?: number;
+  net_amount?: number;
+  description?: string;
   created_at: string;
   updated_at: string;
   campaigns?: Partial<Campaign>;
