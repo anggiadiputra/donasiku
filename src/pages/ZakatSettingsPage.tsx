@@ -4,7 +4,7 @@ import { useOrganization } from '../context/OrganizationContext';
 import { Save, Loader2, Info, Coins } from 'lucide-react';
 import { toast } from 'sonner';
 import DashboardLayout from '../components/DashboardLayout';
-import { supabase, ZakatSettings } from '../lib/supabase';
+import { supabase, ZakatSettings, Campaign } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SettingsPageSkeleton } from '../components/SkeletonLoader';
 
@@ -13,6 +13,7 @@ export default function ZakatSettingsPage() {
   const { selectedOrganization } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
 
   const [settings, setSettings] = useState<ZakatSettings>({
     id: '',
@@ -21,6 +22,7 @@ export default function ZakatSettingsPage() {
     zakat_percentage: 0.025,
     calculation_note: '',
     gold_price_source: '',
+    target_campaign_id: '',
     created_at: '',
     updated_at: ''
   });
@@ -55,7 +57,18 @@ export default function ZakatSettingsPage() {
           gold_price_per_gram: parseFloat(data.gold_price_per_gram) || 1347143.00,
           nishab_gold_grams: parseFloat(data.nishab_gold_grams) || 85.00,
           zakat_percentage: parseFloat(data.zakat_percentage) || 0.025,
+          target_campaign_id: data.target_campaign_id || '',
         });
+      }
+
+      // Fetch Campaigns for dropdown
+      const { data: campaignsData } = await supabase
+        .from('campaigns')
+        .select('id, title')
+        .order('created_at', { ascending: false });
+
+      if (campaignsData) {
+        setCampaigns(campaignsData as Campaign[]);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -73,6 +86,7 @@ export default function ZakatSettingsPage() {
         gold_price_per_gram: parseFloat(settings.gold_price_per_gram.toString()),
         nishab_gold_grams: parseFloat(settings.nishab_gold_grams.toString()),
         zakat_percentage: parseFloat(settings.zakat_percentage.toString()),
+        target_campaign_id: settings.target_campaign_id === '' ? null : settings.target_campaign_id,
       };
 
       // Check if settings exist
@@ -237,6 +251,26 @@ export default function ZakatSettingsPage() {
                   <p className="text-xs text-gray-500 mt-1">
                     Standar zakat: 2.5% (0.025) = {(settings.zakat_percentage * 100).toFixed(2)}%
                   </p>
+                </div>
+
+                <div className="bg-blue-50 p-4 rounded-lg mt-4">
+                  <h4 className="font-semibold text-blue-800 mb-2 text-sm">Target Campaign Content</h4>
+                  <p className="text-xs text-blue-600 mb-3">
+                    Pilih campaign yang akan digunakan untuk menampilkan "Kabar Terbaru" dan "Pencairan Dana" di halaman Zakat.
+                  </p>
+
+                  <select
+                    value={settings.target_campaign_id || ''}
+                    onChange={(e) => setSettings(prev => ({ ...prev, target_campaign_id: e.target.value }))}
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 bg-white text-sm"
+                  >
+                    <option value="">-- Tanpa Campaign (Sembunyikan News/Withdrawals) --</option>
+                    {campaigns.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.title}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>

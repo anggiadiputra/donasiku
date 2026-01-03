@@ -224,6 +224,7 @@ export interface ZakatSettings {
   zakat_percentage: number;
   calculation_note?: string;
   gold_price_source?: string;
+  target_campaign_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -239,6 +240,7 @@ export interface InfaqSettings {
   note_text?: string;
   quran_verse?: string;
   quran_reference?: string;
+  target_campaign_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -250,7 +252,7 @@ export interface FidyahSettings {
   program_description?: string;
   program_image?: string;
   price_per_day: number;
-  target_campaign_id?: string;
+  target_campaign_id?: string | null;
   created_at: string;
   updated_at: string;
 }

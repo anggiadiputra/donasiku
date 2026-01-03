@@ -11,7 +11,7 @@ import {
 import { toast } from 'sonner';
 import DashboardLayout from '../components/DashboardLayout';
 import ImageUpload from '../components/ImageUpload';
-import { supabase, InfaqSettings } from '../lib/supabase';
+import { supabase, InfaqSettings, Campaign } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SettingsPageSkeleton } from '../components/SkeletonLoader';
 
@@ -20,6 +20,7 @@ export default function InfaqSettingsPage() {
   const { selectedOrganization } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
 
   const [settings, setSettings] = useState<InfaqSettings>({
     id: '',
@@ -32,6 +33,7 @@ export default function InfaqSettingsPage() {
     note_text: '',
     quran_verse: '',
     quran_reference: '',
+    target_campaign_id: '',
     created_at: '',
     updated_at: ''
   });
@@ -67,7 +69,18 @@ export default function InfaqSettingsPage() {
             ? data.preset_amounts
             : JSON.parse(data.preset_amounts || '[25000, 50000, 100000, 250000]'),
           default_amount: parseFloat(data.default_amount) || 125000,
+          target_campaign_id: data.target_campaign_id || '',
         });
+      }
+
+      // Fetch Campaigns for dropdown
+      const { data: campaignsData } = await supabase
+        .from('campaigns')
+        .select('id, title')
+        .order('created_at', { ascending: false });
+
+      if (campaignsData) {
+        setCampaigns(campaignsData as Campaign[]);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -82,7 +95,8 @@ export default function InfaqSettingsPage() {
 
       const settingsToSave = {
         ...settings,
-        preset_amounts: settings.preset_amounts
+        preset_amounts: settings.preset_amounts,
+        target_campaign_id: settings.target_campaign_id === '' ? null : settings.target_campaign_id,
       };
 
       // Check if settings exist
@@ -301,6 +315,26 @@ export default function InfaqSettingsPage() {
                       Tambah Preset Amount
                     </button>
                   </div>
+                </div>
+
+                <div className="bg-blue-50 p-4 rounded-lg mt-4">
+                  <h4 className="font-semibold text-blue-800 mb-2 text-sm">Target Campaign Content</h4>
+                  <p className="text-xs text-blue-600 mb-3">
+                    Pilih campaign yang akan digunakan untuk menampilkan "Kabar Terbaru" dan "Pencairan Dana" di halaman Infaq.
+                  </p>
+
+                  <select
+                    value={settings.target_campaign_id || ''}
+                    onChange={(e) => setSettings(prev => ({ ...prev, target_campaign_id: e.target.value }))}
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 bg-white text-sm"
+                  >
+                    <option value="">-- Tanpa Campaign (Sembunyikan News/Withdrawals) --</option>
+                    {campaigns.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.title}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>

@@ -6,7 +6,9 @@ import {
     Plus,
     User,
     ChevronUp,
-    Share2
+    ChevronDown,
+    Share2,
+    Megaphone
 } from 'lucide-react';
 import { supabase, FidyahSettings, Campaign, Donation } from '../lib/supabase';
 import Header from '../components/Header';
@@ -33,6 +35,23 @@ export default function FidyahPage() {
     const [days, setDays] = useState(1);
     const [showFullDescription, setShowFullDescription] = useState(false);
     const [showShareModal, setShowShareModal] = useState(false);
+
+    // Updates State
+    const [updates, setUpdates] = useState<any[]>([]);
+    const [expandedUpdateId, setExpandedUpdateId] = useState<string | null>(null);
+
+    // Helper to format rough "time ago"
+    const getTimeAgo = (dateString: string) => {
+        const seconds = Math.floor((new Date().getTime() - new Date(dateString).getTime()) / 1000);
+        if (seconds < 60) return 'Baru saja';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes} menit yang lalu`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours} jam yang lalu`;
+        const days = Math.floor(hours / 24);
+        if (days < 30) return `${days} hari yang lalu`;
+        return `${Math.floor(days / 30)} bulan yang lalu`;
+    };
 
     useEffect(() => {
         fetchData();
@@ -71,6 +90,9 @@ export default function FidyahPage() {
                 }
 
                 fetchDonors(targetCampaignId);
+                if (targetCampaignId) {
+                    fetchUpdates(targetCampaignId);
+                }
             }
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -134,6 +156,18 @@ export default function FidyahPage() {
             }
         } catch (error) {
             console.error('Error fetching donors:', error);
+        }
+    };
+
+    const fetchUpdates = async (campaignId: string) => {
+        const { data: updatesData, error: updatesError } = await supabase
+            .from('campaign_updates')
+            .select('*')
+            .eq('campaign_id', campaignId)
+            .order('created_at', { ascending: false });
+
+        if (!updatesError && updatesData) {
+            setUpdates(updatesData);
         }
     };
 
@@ -326,10 +360,109 @@ export default function FidyahPage() {
                             </div>
                         </div>
 
-                        {/* Info Terbaru */}
-                        <div className="p-4 mb-2">
-                            <h3 className="font-bold text-gray-900 mb-3">Info Terbaru</h3>
-                            <p className="text-sm text-gray-500 italic">Belum ada kabar terbaru.</p>
+                        {/* Divider Thick */}
+                        <div className="h-2 bg-gray-50 w-full mt-6" />
+
+                        {/* Info Terbaru Section */}
+                        <div className="bg-white overflow-hidden">
+                            <div className="px-5 py-5 border-b border-gray-100">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                        <Megaphone className="w-5 h-5 text-blue-600" />
+                                        Kabar Terbaru
+                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                        {updates.length > 0 && (
+                                            <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2 py-1 rounded-full">{updates.length} Update</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="relative pl-2">
+                                    {/* Vertical Line */}
+                                    <div className="absolute left-[7px] top-2 bottom-4 w-[2px] bg-gray-100"></div>
+
+                                    {(updates.length === 0 || !targetCampaign) ? (
+                                        <div className="text-center py-6 bg-gray-50 rounded-xl border border-gray-100 border-dashed ml-6">
+                                            <p className="text-gray-500 text-sm mb-2">Belum ada kabar terbaru dari penggalang dana.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-6">
+                                            {updates.slice(0, 3).map((update) => (
+                                                <div key={update.id} className="relative pl-8">
+                                                    {/* Dot Indicator */}
+                                                    <div
+                                                        className="absolute left-0 top-1.5 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10"
+                                                        style={{ backgroundColor: primaryColor }}
+                                                    ></div>
+
+                                                    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <h4 className="font-bold text-gray-900 text-sm">{update.title}</h4>
+                                                            <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded-full whitespace-nowrap">
+                                                                {getTimeAgo(update.created_at)}
+                                                            </span>
+                                                        </div>
+
+                                                        {update.image_url && (
+                                                            <div className="mb-3 rounded-lg overflow-hidden h-32 w-full">
+                                                                <img src={update.image_url} alt="Update" className="w-full h-full object-cover" />
+                                                            </div>
+                                                        )}
+
+                                                        <div
+                                                            className={`text-sm text-gray-600 leading-relaxed prose prose-sm max-w-none ${expandedUpdateId === update.id ? '' : 'line-clamp-3'}`}
+                                                            dangerouslySetInnerHTML={{ __html: update.content }}
+                                                        />
+
+                                                        {update.content.length > 150 && (
+                                                            <button
+                                                                onClick={() => setExpandedUpdateId(expandedUpdateId === update.id ? null : update.id)}
+                                                                className="text-xs font-semibold mt-2 flex items-center gap-1 hover:underline"
+                                                                style={{ color: primaryColor }}
+                                                            >
+                                                                {expandedUpdateId === update.id ? (
+                                                                    <>Sembunyikan <ChevronUp className="w-3 h-3" /></>
+                                                                ) : (
+                                                                    <>Lihat Selengkapnya <ChevronDown className="w-3 h-3" /></>
+                                                                )}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {updates.length > 3 && (
+                                                <button className="w-full py-2 text-sm font-medium text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors ml-4">
+                                                    Lihat Semua Kabar ({updates.length})
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Section: Pencairan Dana */}
+                            <div className="px-5 py-5 border-b border-gray-100 bg-gray-50/50">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <h3 className="font-bold text-gray-800">Pencairan Dana</h3>
+                                        <p className="text-xs text-gray-500 mt-1">Transparansi penggunaan dana</p>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            if (targetCampaign?.slug) {
+                                                navigate(`/campaign/${targetCampaign.slug}/withdrawals`);
+                                            }
+                                        }}
+                                        className={`font-semibold text-sm px-3 py-1.5 rounded-lg border transition-colors ${!targetCampaign ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'text-blue-600 bg-blue-50 border-blue-100 hover:bg-blue-100'}`}
+                                        style={targetCampaign ? { color: primaryColor, borderColor: `${primaryColor}20`, backgroundColor: `${primaryColor}10` } : {}}
+                                        disabled={!targetCampaign}
+                                    >
+                                        Lihat Rincian
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Donatur */}
@@ -425,15 +558,16 @@ export default function FidyahPage() {
                         </button>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* Share Modal */}
-            <ShareModal
+            < ShareModal
                 isOpen={showShareModal}
-                onClose={() => setShowShareModal(false)}
+                onClose={() => setShowShareModal(false)
+                }
                 shareUrl={`${window.location.origin}/fidyah?utm_source=socialsharing_donor_web_fidyah&utm_medium=share_campaign_copas&utm_campaign=share_detail_campaign`}
                 shareText="Mari tunaikan Fidyah anda sekarang."
             />
-        </div>
+        </div >
     );
 }
